@@ -1,0 +1,401 @@
+{
+  "store_name": "Demo Electronics Store",
+  "currency": "USD",
+  "schema_version": "1.0",
+  "orders": [
+    {
+      "order_id": "1042",
+      "status": "processing",
+      "items": [
+        {
+          "product": "Wireless Keyboard",
+          "quantity": 1,
+          "unit_price": 49.99
+        }
+      ],
+      "order_date": "2026-11-22",
+      "delivery_date": null,
+      "total": 49.99,
+      "item_condition": "unused",
+      "original_packaging": true,
+      "notes": null
+    },
+    {
+      "order_id": "1043",
+      "status": "shipped",
+      "items": [
+        {
+          "product": "USB-C Hub",
+          "quantity": 1,
+          "unit_price": 39.99
+        }
+      ],
+      "order_date": "2026-11-19",
+      "delivery_date": null,
+      "total": 39.99,
+      "item_condition": "unused",
+      "original_packaging": true,
+      "notes": null
+    },
+    {
+      "order_id": "1044",
+      "status": "processing",
+      "items": [
+        {
+          "product": "Laptop Stand",
+          "quantity": 1,
+          "unit_price": 29.99
+        }
+      ],
+      "order_date": "2026-11-23",
+      "delivery_date": null,
+      "total": 29.99,
+      "item_condition": "unused",
+      "original_packaging": true,
+      "notes": null
+    },
+    {
+      "order_id": "1045",
+      "status": "shipped",
+      "items": [
+        {
+          "product": "27-inch Monitor",
+          "quantity": 1,
+          "unit_price": 229.99
+        }
+      ],
+      "order_date": "2026-11-18",
+      "delivery_date": null,
+      "total": 229.99,
+      "item_condition": "unused",
+      "original_packaging": true,
+      "notes": "Customer reports urgent need for delivery today; no guaranteed delivery date."
+    },
+    {
+      "order_id": "1046",
+      "status": "delivered",
+      "items": [
+        {
+          "product": "Wireless Mouse",
+          "quantity": 1,
+          "unit_price": 24.99
+        },
+        {
+          "product": "Mouse Pad",
+          "quantity": 1,
+          "unit_price": 9.99
+        }
+      ],
+      "order_date": "2026-11-10",
+      "delivery_date": "2026-11-13",
+      "total": 34.98,
+      "item_condition": "unused",
+      "original_packaging": true,
+      "notes": null
+    },
+    {
+      "order_id": "1047",
+      "status": "delivered",
+      "items": [
+        {
+          "product": "Wireless Mouse",
+          "quantity": 2,
+          "unit_price": 24.99
+        },
+        {
+          "product": "USB-C Cable",
+          "quantity": 1,
+          "unit_price": 12.99
+        }
+      ],
+      "order_date": "2026-11-09",
+      "delivery_date": "2026-11-12",
+      "total": 62.97,
+      "item_condition": "unused",
+      "original_packaging": true,
+      "notes": null
+    },
+    {
+      "order_id": "1048",
+      "status": "delivered",
+      "items": [
+        {
+          "product": "Mechanical Keyboard",
+          "quantity": 1,
+          "unit_price": 89.99
+        }
+      ],
+      "order_date": "2026-11-08",
+      "delivery_date": "2026-11-11",
+      "total": 89.99,
+      "item_condition": "unused",
+      "original_packaging": true,
+      "notes": null
+    },
+    {
+      "order_id": "1049",
+      "status": "delivered",
+      "items": [
+        {
+          "product": "Laptop Sleeve",
+          "quantity": 1,
+          "unit_price": 34.99
+        },
+        {
+          "product": "USB-C Charger",
+          "quantity": 1,
+          "unit_price": 44.99
+        }
+      ],
+      "order_date": "2026-11-07",
+      "delivery_date": "2026-11-10",
+      "total": 79.98,
+      "item_condition": "unused",
+      "original_packaging": true,
+      "notes": null
+    },
+    {
+      "order_id": "1050",
+      "status": "delivered",
+      "items": [
+        {
+          "product": "Bluetooth Headphones",
+          "quantity": 1,
+          "unit_price": 79.99
+        }
+      ],
+      "order_date": "2026-11-11",
+      "delivery_date": "2026-11-14",
+      "total": 79.99,
+      "item_condition": "unused",
+      "original_packaging": true,
+      "notes": null
+    },
+    {
+      "order_id": "1051",
+      "status": "delivered",
+      "items": [
+        {
+          "product": "Gaming Mouse",
+          "quantity": 1,
+          "unit_price": 59.99
+        }
+      ],
+      "order_date": "2026-10-05",
+      "delivery_date": "2026-10-10",
+      "total": 59.99,
+      "item_condition": "unused",
+      "original_packaging": true,
+      "notes": null
+    },
+    {
+      "order_id": "1052",
+      "status": "delivered",
+      "items": [
+        {
+          "product": "Over-Ear Headphones",
+          "quantity": 1,
+          "unit_price": 99.99
+        }
+      ],
+      "order_date": "2026-11-06",
+      "delivery_date": "2026-11-10",
+      "total": 99.99,
+      "item_condition": "used",
+      "original_packaging": false,
+      "notes": null
+    },
+    {
+      "order_id": "1053",
+      "status": "delivered",
+      "items": [
+        {
+          "product": "Laptop",
+          "quantity": 1,
+          "unit_price": 1199.0
+        }
+      ],
+      "order_date": "2026-11-15",
+      "delivery_date": "2026-11-18",
+      "total": 1199.0,
+      "item_condition": "damaged",
+      "original_packaging": true,
+      "notes": "Customer reports a cracked screen on arrival."
+    },
+    {
+      "order_id": "1054",
+      "status": "delivered",
+      "items": [
+        {
+          "product": "Wireless Earbuds",
+          "quantity": 1,
+          "unit_price": 69.99
+        },
+        {
+          "product": "Protective Case",
+          "quantity": 1,
+          "unit_price": 14.99
+        }
+      ],
+      "order_date": "2026-11-16",
+      "delivery_date": "2026-11-19",
+      "total": 84.98,
+      "item_condition": "unknown",
+      "original_packaging": true,
+      "notes": "Customer reports one item missing; issue requires human review."
+    },
+    {
+      "order_id": "1055",
+      "status": "processing",
+      "items": [
+        {
+          "product": "USB-C Cable",
+          "quantity": 1,
+          "unit_price": 19.99
+        }
+      ],
+      "order_date": "2026-11-23",
+      "delivery_date": null,
+      "total": 19.99,
+      "item_condition": "unused",
+      "original_packaging": true,
+      "notes": null
+    },
+    {
+      "order_id": "1056",
+      "status": "shipped",
+      "items": [
+        {
+          "product": "Laptop Dock",
+          "quantity": 1,
+          "unit_price": 149.99
+        }
+      ],
+      "order_date": "2026-11-20",
+      "delivery_date": null,
+      "total": 149.99,
+      "item_condition": "unused",
+      "original_packaging": true,
+      "notes": null
+    },
+    {
+      "order_id": "1057",
+      "status": "delivered",
+      "items": [
+        {
+          "product": "Portable SSD 1TB",
+          "quantity": 1,
+          "unit_price": 89.99
+        }
+      ],
+      "order_date": "2026-11-19",
+      "delivery_date": "2026-11-24",
+      "total": 89.99,
+      "item_condition": "unused",
+      "original_packaging": true,
+      "notes": null
+    },
+    {
+      "order_id": "1058",
+      "status": "processing",
+      "items": [
+        {
+          "product": "Wireless Router",
+          "quantity": 1,
+          "unit_price": 109.99
+        }
+      ],
+      "order_date": "2026-11-24",
+      "delivery_date": null,
+      "total": 109.99,
+      "item_condition": "unused",
+      "original_packaging": true,
+      "notes": null
+    },
+    {
+      "order_id": "1059",
+      "status": "delivered",
+      "items": [
+        {
+          "product": "Smartphone",
+          "quantity": 1,
+          "unit_price": 699.0
+        }
+      ],
+      "order_date": "2026-11-17",
+      "delivery_date": "2026-11-21",
+      "total": 699.0,
+      "item_condition": "unknown",
+      "original_packaging": true,
+      "notes": "Carrier marks delivered; customer disputes receipt. Escalation required."
+    },
+    {
+      "order_id": "1060",
+      "status": "delivered",
+      "items": [
+        {
+          "product": "Tablet",
+          "quantity": 1,
+          "unit_price": 329.0
+        }
+      ],
+      "order_date": "2026-11-12",
+      "delivery_date": "2026-11-16",
+      "total": 329.0,
+      "item_condition": "unknown",
+      "original_packaging": true,
+      "notes": "Customer reports three previous unsuccessful support contacts."
+    },
+    {
+      "order_id": "1061",
+      "status": "delivered",
+      "items": [
+        {
+          "product": "Smartwatch",
+          "quantity": 1,
+          "unit_price": 179.0
+        }
+      ],
+      "order_date": "2026-11-18",
+      "delivery_date": "2026-11-22",
+      "total": 179.0,
+      "item_condition": "unknown",
+      "original_packaging": true,
+      "notes": "Customer reports package tampering; escalation required."
+    },
+    {
+      "order_id": "1062",
+      "status": "delivered",
+      "items": [
+        {
+          "product": "Laptop Monitor",
+          "quantity": 1,
+          "unit_price": 249.0
+        }
+      ],
+      "order_date": "2026-11-10",
+      "delivery_date": "2026-11-14",
+      "total": 249.0,
+      "item_condition": "unused",
+      "original_packaging": true,
+      "notes": "Customer requests an exception to the standard return policy; human review required."
+    },
+    {
+      "order_id": "1063",
+      "status": "delivered",
+      "items": [
+        {
+          "product": "Bluetooth Speaker",
+          "quantity": 1,
+          "unit_price": 59.99
+        }
+      ],
+      "order_date": "2026-11-20",
+      "delivery_date": "2026-11-23",
+      "total": 59.99,
+      "item_condition": "unused",
+      "original_packaging": true,
+      "notes": "Customer explicitly requests to speak to a human."
+    }
+  ]
+}
