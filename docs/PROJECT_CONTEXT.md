@@ -8,7 +8,7 @@ The agent under test is an AI Customer Support Agent for a fictional electronics
 
 Tool-using LLM agents can produce a fluent answer while still behaving incorrectly: calling the wrong tool, passing bad arguments, skipping required checks, or promising an outcome the business rules do not allow. A customer support agent is a useful demonstration because its correct behavior depends on real order data and explicit policies such as return windows and cancellation rules.
 
-The repository currently implements the deterministic foundation for such an agent: a mock store, a validated data access layer, five customer support tools, and unit tests. The agent and evaluation framework are planned next. See `docs/DEVELOPMENT_STATUS.md` for the verified state.
+The repository now implements the deterministic foundation (a mock store, a validated data access layer, five customer support tools, and unit tests) and a Baseline Agent built with LangChain `create_agent` over a Google Gemini model, with LangSmith tracing and structured execution traces. The evaluation runner, judge, and comparison framework are planned next. See `docs/DEVELOPMENT_STATUS.md` for the verified state.
 
 ## What this project demonstrates
 
@@ -50,7 +50,7 @@ Non-goals at the current stage: production customer support, real payments or re
 
 | System | Responsibility | Current status |
 | --- | --- | --- |
-| Agent under test | Reads a customer message, chooses tools, supplies arguments, and writes the customer response. | Planned |
+| Agent under test | Reads a customer message, chooses tools, supplies arguments, and writes the customer response. | Implemented (Baseline; not yet evaluated) |
 | Evaluation framework | Runs fixed scenarios, records traces, applies deterministic checks and judge metrics, compares runs, and reports results. | Planned |
 
 The tools belong to the application side, not the evaluation side. Evaluation code must not be embedded in tools, and tools must not know which scenario is running.
@@ -65,11 +65,13 @@ The tools belong to the application side, not the evaluation side. Evaluation co
 | Tests | pytest | In use |
 | Mock data | JSON (`data/mock_store.json`, 22 orders) | In use |
 | Evaluation scenarios | JSON (`data/evaluation_dataset.json`, 25 scenarios) | In use |
-| Agent | LLM tool-calling loop | Planned; framework/model not selected |
-| Evaluation | DeepEval and custom metrics / judges | Planned; not installed |
+| Agent | LangChain `create_agent` + Google Gemini (AI Studio) | Implemented (Baseline) |
+| Tracing | LangSmith | Implemented |
+| CLI | Rich | Implemented |
+| Evaluation | DeepEval and custom metrics / judges | Planned; not installed; judge will use a Groq model via OpenRouter |
 | Regression and CI | Pytest-based quality gates, GitHub Actions | Planned |
 
-No LLM provider, agent framework, or DeepEval dependency is installed yet. The existing code is intentionally deterministic and offline.
+The Baseline Agent, its configuration, LangChain tool wrappers, structured traces, and the Rich CLI are implemented. The Google Gemini agent uses the direct Google AI Studio API; the future judge will use a Groq model through OpenRouter with `langchain-openai`. No DeepEval dependency or judge logic is installed yet; the evaluation runner and metrics are the next milestone.
 
 ## Definition of success
 

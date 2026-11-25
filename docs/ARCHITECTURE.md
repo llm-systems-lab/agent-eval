@@ -12,8 +12,14 @@ This document describes the verified implementation first, then the components t
 | Data access | `src/agent/tools/store.py` | Implemented | Loads JSON, validates it, and serves an isolated in-memory order store. |
 | Customer support tools | `src/agent/tools/customer_support_tools.py` | Implemented | Business rules for status, details, refund eligibility, cancellation, and escalation. |
 | Tool unit tests | `tests/test_customer_support_tools.py` | Implemented | 38 pytest tests using temp data copies and injected dependencies. |
-| Agent orchestration | — | Planned | Calls tools in response to a customer message and produces a response. |
-| Structured execution traces | — | Planned | Preserves tool calls, arguments, results, sequence, and final output. |
+| Agent configuration | `src/agent/config.py` | Implemented | Loads `.env` and exposes independent agent, judge, and LangSmith settings as Pydantic models; secrets use `SecretStr`. |
+| LangChain tool wrappers | `src/agent/toolkit.py` | Implemented | Adapts the five tools for LangChain and serializes their Pydantic results to JSON; delegates all business logic. |
+| Structured execution traces | `src/agent/traces.py` | Implemented | Pydantic `ToolCallRecord`/`AgentRun` models and helpers that pair ordered tool calls with their results. |
+| Baseline Agent | `src/agent/baseline_agent.py` | Implemented | LangChain `create_agent` graph over the tools with a Google Gemini model; records a structured trace per run. |
+| CLI presentation | `src/agent/cli.py` | Implemented | Rich-based terminal rendering of tool calls and the final response; contains no agent logic. |
+| Agent scaffolding tests | `tests/test_agent_scaffolding.py` | Implemented | 16 pytest tests for config, traces, tool wrappers, and agent wiring (no network). |
+| Agent orchestration tests | `tests/test_baseline_agent.py` | Implemented | 8 pytest tests driving the agent with mocked models (no tool call, single call, multiple calls, result capture, streaming, API error, recursion limit). |
+| CLI tests | `tests/test_cli.py` | Implemented | 2 pytest tests for run rendering and graceful error handling. |
 | Evaluation runner | — | Planned | Runs scenarios, captures traces, applies metrics, and records results. |
 | DeepEval and custom metrics | — | Planned | Answer-quality and behavior scoring. |
 | Experiment reports | — | Planned | Baseline vs Improved results and failure analysis. |
@@ -31,35 +37,42 @@ flowchart LR
         MODELS["Pydantic models<br/>models.py"]
         STORE["OrderStore<br/>in-memory copy"]
         TOOLS["Five customer support tools"]
-        TESTS["pytest suite<br/>38 tests"]
+        TESTS["pytest suite<br/>64 tests"]
+        CONFIG["config.py<br/>agent / judge / tracing"]
+        TOOLKIT["toolkit.py<br/>LangChain tool wrappers"]
+        AGENT["Baseline Agent<br/>create_agent + Gemini"]
+        TRACE["traces.py<br/>structured AgentRun"]
+        CLI["cli.py<br/>Rich presentation"]
 
         MS --> STORE
         MODELS --> STORE
         MODELS --> TOOLS
         STORE --> TOOLS
         TESTS -. verifies .-> TOOLS
+        CONFIG --> AGENT
+        TOOLS --> TOOLKIT
+        TOOLKIT --> AGENT
+        AGENT --> TRACE
+        AGENT --> CLI
     end
 
     subgraph Planned["Planned - not implemented"]
-        AGENT["Baseline / Improved Agent"]
-        TRACE["Structured execution traces"]
         RUNNER["Evaluation runner"]
         METRICS["DeepEval + custom metrics"]
         REPORT["Experiment reports"]
         REG["Regression thresholds"]
         CI["GitHub Actions"]
+        IMPROVED["Improved Agent"]
 
         DS --> RUNNER
         RUNNER --> AGENT
-        AGENT --> TRACE
+        RUNNER --> IMPROVED
         TRACE --> METRICS
         RUNNER --> METRICS
         METRICS --> REPORT
         REPORT --> REG
         REG --> CI
     end
-
-    TOOLS -.->|"tool calls"| AGENT
 ```
 
 ## Implemented data layer
@@ -142,17 +155,60 @@ All five tools normalize order IDs by trimming whitespace and a leading `#`. Emp
 
 Fixtures create a temporary copy of `mock_store.json`. The real data file is never mutated.
 
+## Implemented agent layer
+
+The Baseline Agent is implemented with the modern LangChain `create_agent` API. It does not use the deprecated `AgentExecutor`/`initialize_agent`, a custom orchestration loop, or a hand-written graph.
+
+### Configuration
+
+`src/agent/config.py` loads `.env` with `python-dotenv` (`override=False`) and exposes three independent Pydantic models:
+
+- `AgentSettings` — `GOOGLE_API_KEY`, `AGENT_MODEL`, optional `AGENT_TEMPERATURE`.
+- `JudgeSettings` — `OPENROUTER_API_KEY`, `OPENROUTER_BASE_URL` (defaults to `https://openrouter.ai/api/v1`), `JUDGE_MODEL`. Prepared for the future judge; no judge code exists yet.
+- `LangSmithSettings` — `LANGSMITH_TRACING`, `LANGSMITH_API_KEY`, `LANGSMITH_PROJECT`; `apply()` publishes these to the environment LangSmith reads.
+
+Agent and judge settings are loaded by separate functions, so building the agent never requires judge credentials and vice versa. Secrets are held in `SecretStr` and are masked in `repr`, so they cannot leak into logs or traces. No model name or API key is hardcoded.
+
+### Tool wrappers
+
+`src/agent/toolkit.py` exposes `build_customer_support_tools`, which wraps the existing five tools with LangChain's `@tool` decorator. The wrappers only adapt the signatures (each takes the order ID, or an optional order ID and reason for escalation) and serialize the Pydantic results to JSON. Every call is delegated to `agent.tools.customer_support_tools`; no business rule is reimplemented. An optional `store`, `registry`, and `reference_date` are captured by closure and injected through the tools' keyword-only parameters, which lets the runner isolate state per scenario.
+
+### Agent and traces
+
+`src/agent/baseline_agent.py` builds a model with `ChatGoogleGenerativeAI` (Google AI Studio direct API) using `AgentSettings`, and compiles the graph with `create_agent(model=..., tools=..., system_prompt=...)`. The system prompt is intentionally minimal: it states the agent is a customer support assistant, lists the areas it helps with, tells it to use tools when needed and not to invent order information. It deliberately omits detailed business policies, decision trees, and evaluation-specific instructions, so the baseline's weaknesses are discoverable through evaluation. It contains no scenario IDs and no expected tool calls.
+
+`BaselineAgent.run` invokes the graph once (with `invoke`) using a `RunnableConfig` that sets a recursion limit (`DEFAULT_RECURSION_LIMIT = 25`) so multi-call interactions terminate, and returns an `AgentRun` from `src/agent/traces.py`. The graph supports multiple tool calls in a single interaction and stops when the model produces a final answer.
+
+The `AgentRun` records the run ID, the user message, the model name, the `answer` (final customer-facing response), the ordered `tool_calls`, and the serialized `messages`. Each `ToolCallRecord` has `tool_name`, `arguments`, `result` (or `error`), and `call_id`. `extract_tool_calls` pairs calls with their `ToolMessage` results by call ID, `extract_answer` returns the last assistant text (extracting text blocks from Gemini's content-block format), and `serialize_messages` produces a plain structured message list. Tool calls are read from the execution messages, never inferred from the final answer.
+
+### LangSmith tracing
+
+Tracing uses the single LangSmith project `agenteval` (from `LANGSMITH_PROJECT`). Baseline and future Improved agents share this project and are distinguished by tags and metadata rather than separate projects. `BaselineAgent.run_config` passes `tags=["baseline"]`, `metadata={"experiment": "baseline", "agent_version": 1}`, and `run_name="baseline-agent"` to the graph invocation, so LLM calls and tool executions are traced under those labels. No custom tracing callbacks are added and no extra LLM calls are made for tracing. Secrets are never logged.
+
+### CLI
+
+`src/agent/cli.py` is the manual-testing entry point, invoked with `PYTHONPATH=src uv run python -m agent.cli "<message>"` for a single run, or without a message for an interactive session that accepts messages until the user types `exit` or sends Ctrl-D. It uses Rich (`Console`, `Panel`, `Table`, `Status`):
+
+- prints the application title panel (`AgentEval — Customer Support Agent`);
+- shows a `Status` spinner with `Agent is thinking...` while the model is working, and keeps it visible during the actual streamed wait;
+- consumes `BaselineAgent.stream(...)` and updates the status with each tool call and its arguments as they occur, then renders an ordered tool-call table and the answer in a distinct panel;
+- catches agent and API errors and shows them in an error panel without crashing the loop.
+
+Presentation stays separate from agent logic, and the core agent never prints to the terminal. The CLI calls the same `create_baseline_agent`/`BaselineAgent` used by the programmatic interface. It does not dump raw internal messages.
+
+### Evaluation compatibility
+
+The agent exposes everything the future runner needs without adding evaluation code: `create_baseline_agent(...)` creates an instance; `BaselineAgent.run(message)` submits a message and returns an `AgentRun`; `run.answer` is the final answer; `run.tool_calls` are the actual calls with `tool_name`, `arguments`, and `result`; and `run_config`/`create_baseline_agent(tags=..., metadata=...)` associate execution with an experiment version (`baseline`, `agent_version: 1`). A runner can also consume `BaselineAgent.stream(...)` for incremental events. No DeepEval, judge, metrics, database, or persistent conversation memory is implemented.
+
+Isolation for scenario runs uses the existing data layer: `OrderStore` already supports an isolated copy via `OrderStore(data=...)` or `OrderStore(data_path=...)`, and never writes to disk. The runner must construct a fresh `OrderStore` and `EscalationRegistry` per scenario (cancellation and escalation mutate in-memory state) and pass a fixed `reference_date`. No data-layer change is required.
+
+### Agent dependencies
+
+`langchain`, `langchain-google-genai`, `langchain-openai` (for the future judge), `langsmith`, `rich`, and `python-dotenv` are runtime dependencies in `uv.lock`.
+
 ## Planned components
 
 The following are requirements for later milestones, not current code.
-
-### Agent orchestration
-
-A future agent module will accept a customer message, decide whether and which tools to call, supply arguments, consume structured results, and produce a customer-facing answer. It must use the existing tool interfaces rather than reimplementing business rules. Baseline and Improved agents will share the same tool layer and fixed dataset; their differences will be documented rather than hidden.
-
-### Structured execution traces
-
-The runner must capture each run as structured data, not free-text logs. The trace schema is not implemented. It needs to retain at least the scenario ID, user message, ordered tool calls with names and arguments, tool results or errors, the final response, and a run identifier. Trace timings and model metadata may be added later. Traces are the basis for behavior evaluation and failure investigation.
 
 ### Evaluation runner
 
@@ -177,9 +233,12 @@ Experiment reports will summarize aggregate and per-scenario results, including 
 
 ## Known limitations of the current stage
 
-- No agent, no tool-calling loop, and no prompts exist.
-- No evaluation has been run; there are no Baseline or Improved results.
+- The Baseline Agent exists but has not been evaluated; there are no Baseline or Improved results.
+- The Baseline system prompt is intentionally minimal, so the baseline is expected to skip some required pre-checks (for example, calling `cancel_order` without first checking the status) and to miss escalation triggers; these weaknesses are what the evaluation is meant to reveal.
+- The agent handles a single customer message per run; there is no multi-turn conversation state.
+- Running the agent requires a Google API key and network access. Only the scaffolding is unit-tested offline; agent behavior is not.
+- The judge is not implemented; `JudgeSettings` only prepares the OpenRouter configuration.
 - Cancellation and escalation state are in-memory only and reset with the process.
-- The default store and default registry are shared within a process, which is acceptable for local use but unsuitable for parallel scenario execution without isolated instances.
+- The default store and default registry are shared within a process, which is acceptable for local use but unsuitable for parallel scenario execution without isolated instances. The runner must pass a fresh store and registry per scenario.
 - Refund eligibility depends on the current date unless `reference_date` is supplied.
-- The test suite validates the tool layer only; it says nothing about agent quality.
+- The test suite validates the tool layer and the offline agent scaffolding only; it says nothing about agent quality.
