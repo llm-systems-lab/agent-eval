@@ -56,14 +56,14 @@ Behavior checks must read the trace, not infer tool calls from the final answer.
 
 **Purpose:** show that quality is stable across changes, not just good in one run.
 
-**Status:** planned — reliability reporting and regression gates come after the first baseline run.
+**Status:** partially implemented — `src/agent/regression.py` compares a candidate run against a committed baseline and reports regressions, metric errors, and new failures; the manual LLM-evaluation workflow runs the live comparison.
 
 Mechanisms:
 
 - **Baseline vs Improved:** run the same 14 scenarios with both agents and compare layer scores, failure counts, and per-category behavior. Baseline and Improved must differ in documented, intentional ways; the comparison must not hide prompt or tool changes.
 - **Regression testing:** convert known-good behaviors and previously observed failures into repeatable checks so they cannot silently regress.
 - **Quality thresholds:** define minimum deterministic pass rates and judge-score thresholds before claiming an improvement.
-- **CI/CD:** run unit tests, deterministic behavior checks, and the agreed evaluation thresholds in GitHub Actions. Judge-based checks may require API credentials and must degrade explicitly rather than silently skipping.
+- **CI/CD:** run unit tests and deterministic behavior checks in GitHub Actions on every push and pull request. The live evaluation and judge-based checks run in a separate manual workflow that requires API credentials and compares against the committed baseline; judge errors are reported explicitly rather than silently skipped.
 
 Reliability reporting should include run configuration, model identifiers when applicable, date, and any skipped or failed checks.
 

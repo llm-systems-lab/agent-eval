@@ -1,0 +1,69 @@
+name: LLM evaluation
+
+on:
+  workflow_dispatch:
+    inputs:
+      baseline:
+        description: "Baseline results JSONL file or directory."
+        required: true
+        default: "results/baseline_20261126T092405_cc59d7.jsonl"
+      score_tolerance:
+        description: "Allowed drop between two passing metric scores before it counts as a regression."
+        required: true
+        default: "0.1"
+
+jobs:
+  llm-evaluation:
+    name: LLM evaluation
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      AGENT_MODEL: gemini-3.5-flash-lite
+      JUDGE_MODEL: openai/gpt-oss-20b
+      BASELINE: ${{ inputs.baseline }}
+      SCORE_TOLERANCE: ${{ inputs.score_tolerance }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Check baseline
+        run: test -e "$BASELINE"
+
+      - name: Run LLM evaluation
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          uv run eval-runner \
+            --label llm-eval \
+            --results-dir results-llm-eval
+
+      - name: Compare against baseline
+        run: |
+          uv run eval-regression \
+            --baseline "$BASELINE" \
+            --candidate results-llm-eval \
+            --score-tolerance "$SCORE_TOLERANCE"
+
+      - name: Upload evaluation results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: llm-evaluation-results
+          path: results-llm-eval/
+          if-no-files-found: warn
+          retention-days: 14

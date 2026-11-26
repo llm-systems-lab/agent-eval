@@ -16,6 +16,7 @@ dependencies = [
 [project.scripts]
 agent-cli = "agent.cli:main"
 eval-runner = "agent.evaluation_runner:main"
+eval-regression = "agent.regression:main"
 
 [build-system]
 requires = ["hatchling"]

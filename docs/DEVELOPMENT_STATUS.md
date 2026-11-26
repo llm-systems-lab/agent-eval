@@ -32,7 +32,7 @@ The deterministic tool layer is complete and tested. The Baseline Agent is imple
 | Judge model | `src/agent/judge.py`: `OpenRouterJudge` (`DeepEvalBaseLLM`) via `langchain-openai` on OpenRouter, from `JudgeSettings`. |
 | DeepEval metrics | `src/agent/metric_evaluation.py`: Answer Relevancy, Faithfulness, Contextual Precision, Contextual Recall; `src/agent/custom_metrics.py`: Tool Outcome Consistency and Business Policy Compliance; scores/errors stored per scenario. |
 | Judge checks | `src/agent/judge_checks.py`: LLM-judge checks for `expected_facts` and `forbidden_behaviors` via the shared OpenRouter judge; `pass`/`fail`/`error`. |
-| Unit tests | 38 tool tests (`tests/test_customer_support_tools.py`); 20 scaffolding (`tests/test_agent_scaffolding.py`); 8 orchestration (`tests/test_baseline_agent.py`); 2 CLI (`tests/test_cli.py`); 38 evaluation (`tests/test_evaluation_runner.py`); 10 metric (`tests/test_metric_evaluation.py`); 14 custom metric (`tests/test_custom_metrics.py`); 11 judge-check (`tests/test_judge_checks.py`). |
+| Unit tests | 38 tool tests (`tests/test_customer_support_tools.py`); 20 scaffolding (`tests/test_agent_scaffolding.py`); 8 orchestration (`tests/test_baseline_agent.py`); 2 CLI (`tests/test_cli.py`); 38 evaluation (`tests/test_evaluation_runner.py`); 10 metric (`tests/test_metric_evaluation.py`); 14 custom metric (`tests/test_custom_metrics.py`); 11 judge-check (`tests/test_judge_checks.py`); 16 regression (`tests/test_regression.py`). |
 | Documentation | `AGENTS.md`, `docs/PROJECT_CONTEXT.md`, `docs/ARCHITECTURE.md`, `docs/EVALUATION_STRATEGY.md`, this file. |
 
 ## Verification
@@ -58,14 +58,14 @@ Verified locally on 2026-11-25 with Python 3.13.18. Tests use temporary copies o
 | 5 | Run and analyze Baseline evaluation | **Next** — awaits approval to run the 14 scenarios against Gemini. |
 | 6 | Improve agent behavior based on observed failures | Planned. |
 | 7 | Run Improved evaluation and compare results | Planned. |
-| 8 | Add regression testing | Planned. |
-| 9 | Integrate evaluation into GitHub Actions | Partially implemented — `.github/workflows/ci.yml` runs Ruff and pytest on push and PRs to `main`; evaluation thresholds and judge runs remain planned. |
+| 8 | Add regression testing | **Implemented** — `src/agent/regression.py` compares a candidate run against a committed baseline by scenario, check, and metric, with a configurable score tolerance; metric errors are reported separately. Not yet run against a live candidate. |
+| 9 | Integrate evaluation into GitHub Actions | Partially implemented — `.github/workflows/ci.yml` runs Ruff and pytest on push and PRs to `main`; `.github/workflows/llm-evaluation.yml` runs the live evaluation manually and fails on regressions. |
 | 10 | Document results and limitations | Planned. |
 
 ## What intentionally does not exist yet
 
 - No per-scenario threshold gates yet; the custom metrics report scores but do not fail the run.
-- No experiment report or regression thresholds; CI runs lint and unit tests only.
+- No experiment report; the regression gate compares against the committed baseline only when the manual LLM-evaluation workflow is run.
 - No baseline/improved results yet (the baseline experiment has not been run).
 - DeepEval metric scores have not been produced against the real judge.
 - No persistence for cancellation or escalation state.

@@ -31,7 +31,7 @@ This document describes the verified implementation first, then the components t
 | Metric tests | `tests/test_metric_evaluation.py` | Implemented | 10 pytest tests for evidence mapping and metric scoring/error handling with fake metrics (no API calls). |
 | Custom metric tests | `tests/test_custom_metrics.py` | Implemented | 14 pytest tests for Tool Outcome Consistency and Business Policy Compliance pass/fail/error paths and runner integration (fake judge, no API calls). |
 | Experiment reports | — | Planned | Baseline vs Improved results and failure analysis. |
-| Regression testing / CI | — | Planned | Quality thresholds and automated checks in GitHub Actions. |
+| Regression testing / CI | `src/agent/regression.py` | Implemented | Baseline-vs-candidate comparison of scenarios, checks, and metrics with a configurable score tolerance; CI runs lint and unit tests, and a manual workflow runs the live evaluation. |
 
 ## Current and intended data flow
 
@@ -266,7 +266,9 @@ The following are requirements for later milestones, not current code.
 
 ### Reports, regression, and CI
 
-Experiment reports will summarize aggregate and per-scenario results, including failures and metric disagreements. Regression gates will compare against stored thresholds or a prior run. GitHub Actions (`.github/workflows/ci.yml`) runs Ruff and the offline unit test suite on every push and on pull requests to `main`; no live evaluation or judge metrics run in CI.
+Experiment reports will summarize aggregate and per-scenario results, including failures and metric disagreements. GitHub Actions (`.github/workflows/ci.yml`) runs Ruff and the offline unit test suite on every push and on pull requests to `main`; no live evaluation or judge metrics run in CI.
+
+`src/agent/regression.py` (`uv run eval-regression`) compares a candidate results file against a committed baseline. A baseline pass that becomes a candidate failure, error, or missing record is a regression; a score drop greater than the configurable tolerance between two passing metric results is also a regression. Candidate metric errors are reported separately and never counted as passes. The separate `.github/workflows/llm-evaluation.yml` workflow runs the real evaluation manually (`workflow_dispatch`), compares against the committed baseline, fails on regressions, and uploads results as an artifact.
 
 ## Boundaries that must survive later changes
 
