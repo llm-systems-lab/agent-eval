@@ -459,8 +459,8 @@ class TestRunner:
 
     def test_runner_attaches_and_persists_metric_scores(self, tmp_path: Path) -> None:
         metrics = [
-            ("Answer Relevancy", FakeMetric(score=0.75)),
-            ("Faithfulness", FakeMetric(score=1.0)),
+            ("Tool Correctness", FakeMetric(score=0.75)),
+            ("Task Completion", FakeMetric(score=1.0)),
         ]
         runner = make_runner(
             tmp_path,
@@ -472,15 +472,15 @@ class TestRunner:
         result = runner.run([cancellation_scenario("s1")])
 
         row = result.results[0]
-        assert [m.name for m in row.metrics] == ["Answer Relevancy", "Faithfulness"]
+        assert [m.name for m in row.metrics] == ["Tool Correctness", "Task Completion"]
         assert row.metrics[0].score == 0.75
         persisted = json.loads(Path(result.results_path).read_text().strip())
         assert persisted["metrics"][1]["score"] == 1.0
 
     def test_metric_error_does_not_stop_the_run(self, tmp_path: Path) -> None:
         metrics = [
-            ("Answer Relevancy", FakeMetric(error="rate limited")),
-            ("Faithfulness", FakeMetric(score=0.6)),
+            ("Tool Correctness", FakeMetric(error="rate limited")),
+            ("Argument Correctness", FakeMetric(score=0.6)),
         ]
         runner = make_runner(
             tmp_path,

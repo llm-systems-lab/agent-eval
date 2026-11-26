@@ -27,9 +27,9 @@ This document describes the verified implementation first, then the components t
 | Evaluation tests | `tests/test_evaluation_runner.py` | Implemented | 38 pytest tests for the loader, checks, isolation, incremental saving, error handling, resume, single-scenario rerun, timeout, progress, scenario metadata, judge checks, cancellation precondition, metric integration, metric summary counts, and CLI validation (mocked agent/judge, no network). |
 | Judge-check tests | `tests/test_judge_checks.py` | Implemented | 11 pytest tests for expected-fact and forbidden-behavior judging and deterministic-fact filtering (fake judge, no API calls). |
 | Judge model | `src/agent/judge.py` | Implemented | OpenRouter-backed DeepEval judge (Groq model via OpenRouter), built from `JudgeSettings`. |
-| DeepEval metrics | `src/agent/metric_evaluation.py` | Implemented | Answer Relevancy, Faithfulness, Contextual Precision, Contextual Recall over each scenario's answer and tool-result evidence. |
-| Metric tests | `tests/test_metric_evaluation.py` | Implemented | 10 pytest tests for evidence mapping and metric scoring/error handling with fake metrics (no API calls). |
-| Custom metric tests | `tests/test_custom_metrics.py` | Implemented | 14 pytest tests for Tool Outcome Consistency and Business Policy Compliance pass/fail/error paths and runner integration (fake judge, no API calls). |
+| DeepEval metrics | `src/agent/metric_evaluation.py` | Implemented | Tool Correctness, Argument Correctness, Task Completion, Step Efficiency over each scenario's answer, called tools, and structured execution trace. |
+| Metric tests | `tests/test_metric_evaluation.py` | Implemented | 17 pytest tests for tool/trace mapping, test-case construction, metric wiring, and metric scoring/error handling with fake metrics (no API calls). |
+| Custom metric tests | `tests/test_custom_metrics.py` | Implemented | 11 pytest tests for Tool Outcome Consistency and Business Policy Compliance pass/fail/prompt paths and runner integration (stub judge, no API calls). |
 | Experiment reports | — | Planned | Baseline vs Improved results and failure analysis. |
 | Regression testing / CI | `src/agent/regression.py` | Implemented | Baseline-vs-candidate comparison of scenarios, checks, and metrics with a configurable score tolerance; CI runs lint and unit tests, and a manual workflow runs the live evaluation. |
 
@@ -239,18 +239,19 @@ The runner has not yet been executed against Gemini; that is the next milestone 
 
 `src/agent/metric_evaluation.py` adds six DeepEval metrics per scenario, run inside the existing runner after the deterministic checks:
 
-- Standard metrics: **Answer Relevancy**, **Faithfulness**, **Contextual Precision**, **Contextual Recall**.
+- Standard agent metrics: **Tool Correctness**, **Argument Correctness**, **Task Completion**, **Step Efficiency**.
 - Custom metrics in `src/agent/custom_metrics.py`: **Tool Outcome Consistency** and **Business Policy Compliance**.
 
-Evidence mapping (there is no retrieval layer, so the agent's own tool results are the evidence):
+Evidence mapping (there is no retrieval layer, so the agent's own tool calls and trace are the evidence):
 
 - `input` = the scenario customer message;
 - `actual_output` = the agent's final `answer`;
-- `retrieval_context` = the agent's tool results (`"<tool>: <result json>"` per call);
-- `expected_output` = the scenario `expected_facts` joined by newlines (`None` when empty);
+- `tools_called` = the agent's executed tool calls (`name`, `input_parameters`, parsed `output`);
+- `expected_tools` = the scenario `expected_tool_calls` mapped to DeepEval `ToolCall` names;
+- `_trace_dict` = a nested span trace built from the agent run (an `agent` root with one `tool` child per call), used by Task Completion and Step Efficiency;
 - `metadata` = the serialized scenario and agent run, used by the custom metrics.
 
-The custom metrics extend `deepeval.metrics.BaseMetric` and reuse the same OpenRouter judge. **Tool Outcome Consistency** asks the judge whether the final answer makes claims unsupported by the tool results (completed refunds, cancellations, escalation follow-ups, or resolution times). **Business Policy Compliance** asks the judge whether the answer complies with the store policy text in `custom_metrics.STORE_POLICY` (refund eligibility, privacy, and unsupported guarantees). Both metrics score 1.0/0.0 with a 0.5 threshold, record `score`, `reason`, `success`, and `name`, and convert judge or evidence errors into a metric `error` that never passes.
+The custom metrics are DeepEval `GEval` metrics that reuse the same OpenRouter judge. **Tool Outcome Consistency** asks the judge whether the final answer makes claims unsupported by the tool results (completed refunds, cancellations, escalation follow-ups, or resolution times). **Business Policy Compliance** asks the judge whether the answer complies with the store policy text in `custom_metrics.STORE_POLICY` (refund eligibility, privacy, and unsupported guarantees). Both metrics use the customer message, the agent answer, and the run metadata as evaluation parameters, keep a 0.5 threshold, and record `score`, `reason`, `success`, and `name`; a judge failure is recorded by the runner as a metric `error` that never passes.
 
 The judge is a separate model, never the Gemini agent: `src/agent/judge.py` defines `OpenRouterJudge`, a `DeepEvalBaseLLM` wrapping `langchain_openai.ChatOpenAI` pointed at `OPENROUTER_BASE_URL` with `OPENROUTER_API_KEY` and `JUDGE_MODEL`. Structured output is used when a metric requests a Pydantic schema. `build_metrics(judge)` instantiates the six metrics bound to that judge.
 
@@ -286,7 +287,7 @@ Experiment reports will summarize aggregate and per-scenario results, including 
 - `expected_facts` and forbidden behaviors that do not name a specific tool are scored by the LLM judge (`judge_checks`), not by the Python checks; forbidden tool calls named in the scenario text are also caught deterministically. Judge checks require the OpenRouter judge and are skipped (not failed) when it is not configured.
 - The agent handles a single customer message per run; there is no multi-turn conversation state.
 - Running the agent requires a Google API key and network access. Running metrics additionally requires an OpenRouter key and judge model. The unit tests mock both the agent model and the metrics and make no API calls.
-- `expected_output` for the contextual metrics is derived from `expected_facts` (joined); scenarios without expected facts yield `None` and their Contextual Precision/Recall metrics record an error instead of a score.
+- Task Completion and Step Efficiency read the nested execution trace built from the agent run; a run with no tool calls still produces a valid agent-root trace.
 - The DeepEval metrics have not been run against the real judge yet.
 - Cancellation and escalation state are in-memory only and reset with the process.
 - The runner creates a fresh `OrderStore` and `EscalationRegistry` per scenario, so scenarios are isolated; the agent's process-wide defaults are not used for evaluation.

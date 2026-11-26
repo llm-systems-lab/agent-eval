@@ -17,7 +17,7 @@ from pydantic import BaseModel
 from .config import JudgeSettings, load_judge_settings
 
 
-class OpenRouterJudge(DeepEvalBaseLLM):
+class OpenRouterJudge(DeepEvalBaseLLM):  # type: ignore[no-untyped-call]
     """DeepEval judge backed by a Groq model hosted on OpenRouter."""
 
     def __init__(self, settings: JudgeSettings) -> None:
@@ -29,7 +29,7 @@ class OpenRouterJudge(DeepEvalBaseLLM):
             temperature=0,
         )
 
-    def load_model(self) -> ChatOpenAI:
+    def load_model(self) -> Any:
         return self._model
 
     def get_model_name(self) -> str:

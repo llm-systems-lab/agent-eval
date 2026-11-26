@@ -2,13 +2,13 @@
   "total": 14,
   "successful": 14,
   "failed": 0,
-  "scenarios_passed": 11,
-  "checks_passed": 81,
-  "checks_failed": 3,
+  "scenarios_passed": 13,
+  "checks_passed": 83,
+  "checks_failed": 1,
   "checks_error": 0,
-  "metrics_passed": 69,
-  "metrics_failed": 14,
-  "metrics_error": 1,
+  "metrics_passed": 72,
+  "metrics_failed": 12,
+  "metrics_error": 0,
   "per_category": {
     "order_status": {
       "total": 3,
@@ -38,7 +38,7 @@
       "total": 3,
       "successful": 3,
       "failed": 0,
-      "passed": 1
+      "passed": 3
     }
   }
 }

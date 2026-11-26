@@ -23,13 +23,16 @@ The same dataset must be used for the Baseline and Improved agents. Changing sce
 
 **Purpose:** judge the customer-facing response independently of the tool trace.
 
-**Status:** implemented. Six DeepEval metrics — Answer Relevancy, Faithfulness, Contextual Precision, Contextual Recall, Tool Outcome Consistency, and Business Policy Compliance — run per scenario with an OpenRouter-backed Groq judge (`src/agent/judge.py`, `src/agent/metric_evaluation.py`, `src/agent/custom_metrics.py`). The custom metrics check tool-outcome consistency and business-policy compliance. Scores and errors are stored in the JSONL results. The metrics have not been run against the real judge yet. Potential metrics:
+**Status:** implemented. Six DeepEval metrics — Tool Correctness, Argument Correctness, Task Completion, Step Efficiency, Tool Outcome Consistency, and Business Policy Compliance — run per scenario with an OpenRouter-backed Groq judge (`src/agent/judge.py`, `src/agent/metric_evaluation.py`, `src/agent/custom_metrics.py`). The four standard metrics are DeepEval Agent Evaluation metrics over the agent's called tools and structured execution trace; the two custom metrics are DeepEval `GEval` metrics that check tool-outcome consistency and business-policy compliance. Scores and errors are stored in the JSONL results. The metrics have not been run against the real judge yet. Potential metrics:
 
 | Metric | Question |
 | --- | --- |
-| Answer relevancy | Does the answer address the customer's actual request? |
-| Faithfulness / groundedness | Is the answer supported by tool results and known policy? |
-| Hallucination detection | Did the answer invent statuses, amounts, dates, or outcomes? |
+| Tool correctness | Were the expected tools called, and were tools selected appropriately? |
+| Argument correctness | Were the tool call arguments correct for the customer's request? |
+| Task completion | Did the agent complete the task the customer asked for? |
+| Step efficiency | Did the agent reach the outcome without unnecessary steps? |
+| Tool outcome consistency | Is the answer supported by the actual tool results? |
+| Business policy compliance | Does the answer comply with store policy? |
 | Fact compliance | Are `expected_facts` present and `forbidden_behaviors` absent? |
 
 Answer quality alone is not sufficient. A polite, relevant answer can still claim a cancellation succeeded when the tool rejected it. Layer 1 results must be read alongside behavior results.
