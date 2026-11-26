@@ -2,11 +2,11 @@
 
 ## Status
 
-The evaluation framework is planned. The repository currently contains the fixed dataset and the deterministic tool layer; no agent, runner, DeepEval dependency, report, or CI job exists. This document defines how the three layers will be implemented and evaluated.
+The Baseline Agent, the evaluation runner, deterministic behavior checks, and the DeepEval metric layer are implemented. There is no experiment report, regression gate, or CI job yet, and no experiment has been run. This document defines how the three layers are implemented and evaluated.
 
 ## The fixed evaluation dataset
 
-`data/evaluation_dataset.json` contains 25 scenarios, five in each category: `order_status`, `order_details`, `refund`, `cancellation`, and `escalation`. Nine scenarios set `should_escalate: true`.
+`data/evaluation_dataset.json` contains 14 scenarios across five categories: `order_status`, `order_details`, `refund`, `cancellation`, and `escalation`. Six scenarios set `should_escalate: true`.
 
 Each scenario provides:
 
@@ -23,9 +23,7 @@ The same dataset must be used for the Baseline and Improved agents. Changing sce
 
 **Purpose:** judge the customer-facing response independently of the tool trace.
 
-**Status:** planned. No judge model or DeepEval metric is configured.
-
-Potential metrics:
+**Status:** implemented. Six DeepEval metrics — Answer Relevancy, Faithfulness, Contextual Precision, Contextual Recall, Tool Outcome Consistency, and Business Policy Compliance — run per scenario with an OpenRouter-backed Groq judge (`src/agent/judge.py`, `src/agent/metric_evaluation.py`, `src/agent/custom_metrics.py`). The custom metrics check tool-outcome consistency and business-policy compliance. Scores and errors are stored in the JSONL results. The metrics have not been run against the real judge yet. Potential metrics:
 
 | Metric | Question |
 | --- | --- |
@@ -40,7 +38,7 @@ Answer quality alone is not sufficient. A polite, relevant answer can still clai
 
 **Purpose:** determine whether the agent used the tools correctly.
 
-**Status:** planned deterministic checks over structured execution traces.
+**Status:** implemented as deterministic checks over structured execution traces (`src/agent/behavior_checks.py`).
 
 | Metric | What it checks |
 | --- | --- |
@@ -58,11 +56,11 @@ Behavior checks must read the trace, not infer tool calls from the final answer.
 
 **Purpose:** show that quality is stable across changes, not just good in one run.
 
-**Status:** planned.
+**Status:** planned — reliability reporting and regression gates come after the first baseline run.
 
 Mechanisms:
 
-- **Baseline vs Improved:** run the same 25 scenarios with both agents and compare layer scores, failure counts, and per-category behavior. Baseline and Improved must differ in documented, intentional ways; the comparison must not hide prompt or tool changes.
+- **Baseline vs Improved:** run the same 14 scenarios with both agents and compare layer scores, failure counts, and per-category behavior. Baseline and Improved must differ in documented, intentional ways; the comparison must not hide prompt or tool changes.
 - **Regression testing:** convert known-good behaviors and previously observed failures into repeatable checks so they cannot silently regress.
 - **Quality thresholds:** define minimum deterministic pass rates and judge-score thresholds before claiming an improvement.
 - **CI/CD:** run unit tests, deterministic behavior checks, and the agreed evaluation thresholds in GitHub Actions. Judge-based checks may require API credentials and must degrade explicitly rather than silently skipping.
@@ -97,7 +95,7 @@ Per-category and per-scenario results should be reported. A high aggregate score
 
 A valid comparison requires:
 
-- identical 25 scenarios and corresponding expected behavior;
+- identical 14 scenarios and corresponding expected behavior;
 - the same tool layer and mock data;
 - recorded configuration for each run;
 - both aggregate and per-scenario deltas;
@@ -108,7 +106,7 @@ A valid comparison requires:
 
 ## Metric limitations
 
-- The dataset is small (25 scenarios) and static; it demonstrates methodology rather than statistical confidence.
+- The dataset is small (14 scenarios) and static; it demonstrates methodology rather than statistical confidence.
 - Mock orders and fixed policies are simpler than production support.
 - Exact tool-call matching can reward dogmatic behavior and miss valid alternative paths; this must be reviewed when defining checks.
 - LLM judges vary with model version, prompt, temperature, and sampling. Scores may not reproduce exactly.
@@ -116,4 +114,4 @@ A valid comparison requires:
 - Refund checks depend on a reference date; evaluations must fix it so runs are comparable.
 - Passing the dataset does not prove production safety, compliance, or privacy handling.
 
-Results and limitations will be documented with the experiment report once the evaluation runner exists. No results are claimed today.
+Results and limitations will be documented with the experiment report once the runner has been executed. No experiment results are claimed today.

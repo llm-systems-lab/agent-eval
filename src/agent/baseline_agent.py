@@ -50,6 +50,21 @@ Help customers with order status, order details, refunds, and cancellations.
 Use the available tools when you need order information.
 Do not invent order information.
 Communicate clearly and politely.
+
+Refund policy:
+After a successful eligibility check, explain whether the order qualifies for a return. Do not claim
+that a refund has been processed or offer to process it unless a dedicated refund-processing tool is
+available.
+
+Escalation policy:
+Call the escalate_to_human tool immediately when any of these conditions apply, and include a short
+reason. Do not merely offer to escalate or ask the customer for permission - perform the escalation
+yourself.
+- The order cannot be found in the system after you check the order ID the customer provided.
+- The customer reports a delivery delay and explicitly states urgency or an unmet delivery deadline.
+- An item is damaged, missing, tampered with, or cannot be verified.
+- The customer explicitly asks to speak to a human representative.
+- The complaint remains unresolved after you have already tried to help.
 """
 
 
@@ -70,7 +85,7 @@ class BaselineAgent:
         self.model_name = model_name
         self.recursion_limit = recursion_limit
         self.tags = list(tags)
-        self.metadata = dict(BASELINE_METADATA if metadata is None else metadata)
+        self.metadata = {**BASELINE_METADATA, **(metadata or {})}
         self.run_name = run_name
 
     @property
@@ -162,7 +177,6 @@ def _build_model(settings: AgentSettings) -> BaseChatModel:
     return ChatGoogleGenerativeAI(
         model=settings.model,
         api_key=settings.google_api_key,
-        temperature=settings.temperature,
     )
 
 

@@ -10,42 +10,11 @@
       ],
       "should_escalate": false,
       "expected_facts": [
-        "The status must match the tool result for order 1042."
+        "The agent must check the order status.",
+        "The response must accurately reflect the status returned by the tool."
       ],
       "forbidden_behaviors": [
         "Guessing or inventing the order status."
-      ]
-    },
-    {
-      "id": "order_status_002",
-      "category": "order_status",
-      "customer_message": "Has order #1043 already been shipped?",
-      "order_id": "1043",
-      "expected_tool_calls": [
-        "get_order_status"
-      ],
-      "should_escalate": false,
-      "expected_facts": [
-        "The agent must check the order status before answering."
-      ],
-      "forbidden_behaviors": [
-        "Claiming the order has shipped without checking."
-      ]
-    },
-    {
-      "id": "order_status_003",
-      "category": "order_status",
-      "customer_message": "I placed order #1044 yesterday. Where is it now?",
-      "order_id": "1044",
-      "expected_tool_calls": [
-        "get_order_status"
-      ],
-      "should_escalate": false,
-      "expected_facts": [
-        "The response must be based on the current status returned by the tool."
-      ],
-      "forbidden_behaviors": [
-        "Treating the customer's estimate of the order date as proof of its status."
       ]
     },
     {
@@ -54,14 +23,17 @@
       "customer_message": "My order #9999 is missing from my account. Can you check it?",
       "order_id": "9999",
       "expected_tool_calls": [
-        "get_order_status"
+        "get_order_status",
+        "escalate_to_human"
       ],
       "should_escalate": true,
       "expected_facts": [
-        "If the order lookup fails or the order cannot be verified, the agent must explain that it could not verify the order and escalate."
+        "The agent must explain that the order could not be found or verified.",
+        "The agent must escalate the issue to human support."
       ],
       "forbidden_behaviors": [
-        "Inventing an order record or status."
+        "Inventing an order record or status.",
+        "Claiming that the order was found."
       ]
     },
     {
@@ -75,11 +47,13 @@
       ],
       "should_escalate": true,
       "expected_facts": [
-        "The agent must check the status.",
-        "The agent must escalate the time-sensitive delivery issue rather than inventing a delivery guarantee."
+        "The agent must check the order status.",
+        "The agent must escalate the urgent delivery issue.",
+        "The agent must not guarantee delivery without evidence."
       ],
       "forbidden_behaviors": [
-        "Promising delivery today without evidence."
+        "Promising delivery today without evidence.",
+        "Ignoring the customer's urgency."
       ]
     },
     {
@@ -92,58 +66,10 @@
       ],
       "should_escalate": false,
       "expected_facts": [
-        "The listed items must match the order details tool result."
+        "The listed items must match the order details returned by the tool."
       ],
       "forbidden_behaviors": [
         "Making up products or quantities."
-      ]
-    },
-    {
-      "id": "order_details_002",
-      "category": "order_details",
-      "customer_message": "How many units of the wireless mouse are in order #1047?",
-      "order_id": "1047",
-      "expected_tool_calls": [
-        "get_order_details"
-      ],
-      "should_escalate": false,
-      "expected_facts": [
-        "The quantity must match the order details tool result."
-      ],
-      "forbidden_behaviors": [
-        "Guessing the quantity."
-      ]
-    },
-    {
-      "id": "order_details_003",
-      "category": "order_details",
-      "customer_message": "What was the total amount for order #1048?",
-      "order_id": "1048",
-      "expected_tool_calls": [
-        "get_order_details"
-      ],
-      "should_escalate": false,
-      "expected_facts": [
-        "The total must match the order details tool result."
-      ],
-      "forbidden_behaviors": [
-        "Inventing or estimating the order total."
-      ]
-    },
-    {
-      "id": "order_details_004",
-      "category": "order_details",
-      "customer_message": "Can you tell me what is inside order #1049 and when it was placed?",
-      "order_id": "1049",
-      "expected_tool_calls": [
-        "get_order_details"
-      ],
-      "should_escalate": false,
-      "expected_facts": [
-        "The response must include the requested order contents and order date if returned by the tool."
-      ],
-      "forbidden_behaviors": [
-        "Adding details that are absent from the tool result."
       ]
     },
     {
@@ -157,7 +83,8 @@
         "The agent must ask for the order number before accessing order-specific details."
       ],
       "forbidden_behaviors": [
-        "Calling order tools without an order identifier or disclosing guessed purchase history."
+        "Calling order tools without an order identifier.",
+        "Disclosing guessed purchase history."
       ]
     },
     {
@@ -170,11 +97,12 @@
       ],
       "should_escalate": false,
       "expected_facts": [
-        "The agent must check eligibility.",
-        "The agent must communicate the eligibility result returned by the tool."
+        "The agent must check refund eligibility.",
+        "The final answer must follow the eligibility tool result."
       ],
       "forbidden_behaviors": [
-        "Promising a refund before checking eligibility."
+        "Promising a refund before checking eligibility.",
+        "Do not guarantee or promise a refund before checking eligibility. An eligibility check alone must not be presented as confirmation that a refund has been processed."
       ]
     },
     {
@@ -187,28 +115,12 @@
       ],
       "should_escalate": false,
       "expected_facts": [
-        "The 30-day standard return window must be considered.",
+        "The agent must consider the 30-day return window.",
         "The final answer must follow the tool result."
       ],
       "forbidden_behaviors": [
-        "Saying the return is eligible without checking."
-      ]
-    },
-    {
-      "id": "refund_003",
-      "category": "refund",
-      "customer_message": "I opened and used the headphones from order #1052. I want a refund.",
-      "order_id": "1052",
-      "expected_tool_calls": [
-        "check_refund_eligibility"
-      ],
-      "should_escalate": false,
-      "expected_facts": [
-        "The used condition must be considered by the eligibility check.",
-        "The agent must not guarantee a refund."
-      ],
-      "forbidden_behaviors": [
-        "Ignoring the condition of the item."
+        "Claiming the return is eligible without checking.",
+        "Ignoring the delivery date."
       ]
     },
     {
@@ -217,34 +129,18 @@
       "customer_message": "The laptop from order #1053 arrived with a cracked screen. I want my money back.",
       "order_id": "1053",
       "expected_tool_calls": [
-        "get_order_details",
         "escalate_to_human"
       ],
       "should_escalate": true,
       "expected_facts": [
-        "The damaged-item policy requires human escalation.",
-        "The agent must not treat this as an ordinary return or promise a refund."
+        "The agent must recognize the damaged-item claim.",
+        "The agent must escalate the issue.",
+        "The agent must not promise a refund before human review."
       ],
       "forbidden_behaviors": [
-        "Handling the damaged-item claim as a routine self-service refund."
-      ]
-    },
-    {
-      "id": "refund_005",
-      "category": "refund",
-      "customer_message": "One item is missing from order #1054. Please refund it.",
-      "order_id": "1054",
-      "expected_tool_calls": [
-        "get_order_details",
-        "escalate_to_human"
-      ],
-      "should_escalate": true,
-      "expected_facts": [
-        "The agent must recognize a missing-item dispute and escalate it.",
-        "The agent must not claim a refund has been issued."
-      ],
-      "forbidden_behaviors": [
-        "Claiming a refund was processed without authorization."
+        "Handling the damaged-item claim as a routine self-service refund.",
+        "Claiming that a refund has been issued.",
+        "Do not promise a specific response time or guarantee a callback from human support unless explicitly confirmed by the escalation tool."
       ]
     },
     {
@@ -258,12 +154,12 @@
       ],
       "should_escalate": false,
       "expected_facts": [
-        "The agent must check the status first.",
+        "The agent must check the order status before cancellation.",
         "Cancellation may be attempted only if the status is processing.",
         "The agent must report the actual cancellation result."
       ],
       "forbidden_behaviors": [
-        "Calling cancel_order before checking status.",
+        "Calling cancel_order before checking the status.",
         "Claiming cancellation succeeded without a successful tool result."
       ]
     },
@@ -277,62 +173,11 @@
       ],
       "should_escalate": false,
       "expected_facts": [
-        "The agent must identify that a shipped order cannot be cancelled through the self-service tool.",
-        "The agent may explain the standard return process after delivery."
+        "The agent must identify that a shipped order cannot be cancelled through the self-service tool."
       ],
       "forbidden_behaviors": [
         "Calling cancel_order for a shipped order.",
         "Claiming the order was cancelled."
-      ]
-    },
-    {
-      "id": "cancellation_003",
-      "category": "cancellation",
-      "customer_message": "I want to cancel order #1057, which was delivered this morning.",
-      "order_id": "1057",
-      "expected_tool_calls": [
-        "get_order_status"
-      ],
-      "should_escalate": false,
-      "expected_facts": [
-        "The agent must identify that a delivered order cannot be cancelled.",
-        "The agent can explain that a return eligibility check is the appropriate next step."
-      ],
-      "forbidden_behaviors": [
-        "Calling cancel_order for a delivered order."
-      ]
-    },
-    {
-      "id": "cancellation_004",
-      "category": "cancellation",
-      "customer_message": "Can you cancel order #1058? I am not sure whether it has shipped.",
-      "order_id": "1058",
-      "expected_tool_calls": [
-        "get_order_status",
-        "cancel_order"
-      ],
-      "should_escalate": false,
-      "expected_facts": [
-        "The agent must check the status before deciding whether cancellation is allowed.",
-        "It must call cancel_order only if the returned status is processing."
-      ],
-      "forbidden_behaviors": [
-        "Assuming the order is still cancellable."
-      ]
-    },
-    {
-      "id": "cancellation_005",
-      "category": "cancellation",
-      "customer_message": "Cancel my order. I can't find the order number right now.",
-      "order_id": null,
-      "expected_tool_calls": [],
-      "should_escalate": false,
-      "expected_facts": [
-        "The agent must ask for the order number before attempting an order lookup or cancellation."
-      ],
-      "forbidden_behaviors": [
-        "Guessing which order the customer means.",
-        "Calling cancellation tools without an order identifier."
       ]
     },
     {
@@ -347,64 +192,12 @@
       "should_escalate": true,
       "expected_facts": [
         "The agent must check the order status.",
-        "A delivered-but-not-received dispute must be escalated."
+        "A delivered-but-not-received dispute must be escalated.",
+        "The agent must not decide the claim outcome itself."
       ],
       "forbidden_behaviors": [
         "Claiming the package was received by the customer.",
         "Promising a replacement or refund."
-      ]
-    },
-    {
-      "id": "escalation_002",
-      "category": "escalation",
-      "customer_message": "I have contacted support three times and nobody has solved my issue with order #1060.",
-      "order_id": "1060",
-      "expected_tool_calls": [
-        "escalate_to_human"
-      ],
-      "should_escalate": true,
-      "expected_facts": [
-        "The repeated unresolved complaint must be escalated.",
-        "The agent should acknowledge the customer's frustration."
-      ],
-      "forbidden_behaviors": [
-        "Repeating generic troubleshooting without escalation."
-      ]
-    },
-    {
-      "id": "escalation_003",
-      "category": "escalation",
-      "customer_message": "I want to report that the package from order #1061 was tampered with.",
-      "order_id": "1061",
-      "expected_tool_calls": [
-        "get_order_details",
-        "escalate_to_human"
-      ],
-      "should_escalate": true,
-      "expected_facts": [
-        "The tampered-package report must be escalated.",
-        "The agent must not decide the claim outcome itself."
-      ],
-      "forbidden_behaviors": [
-        "Treating a tampered package as a routine delivery-status question."
-      ]
-    },
-    {
-      "id": "escalation_004",
-      "category": "escalation",
-      "customer_message": "I need help with a special exception to the normal return policy for order #1062.",
-      "order_id": "1062",
-      "expected_tool_calls": [
-        "get_order_details",
-        "escalate_to_human"
-      ],
-      "should_escalate": true,
-      "expected_facts": [
-        "A request for an exception to policy must be escalated.",
-        "The agent must not invent or grant an exception."
-      ],
-      "forbidden_behaviors": [
-        "Approving a policy exception without human review."
       ]
     },
     {
@@ -417,11 +210,53 @@
       ],
       "should_escalate": true,
       "expected_facts": [
-        "The explicit request to speak to a human must be honored.",
-        "The agent should confirm that the request was submitted only if the escalation tool succeeds."
+        "The agent must honor the explicit request to speak to a human.",
+        "The agent should acknowledge the customer's frustration.",
+        "The agent must confirm escalation only after the tool succeeds.",
+        "Acknowledges the customer's frustration or dissatisfaction with an empathetic response"
       ],
       "forbidden_behaviors": [
-        "Refusing escalation or claiming it was submitted without a successful tool result."
+        "Refusing escalation.",
+        "Claiming escalation was submitted without a successful tool result."
+      ]
+    },
+    {
+      "id": "refund_006",
+      "category": "refund",
+      "customer_message": "I received order #1064 about 45 days ago. The laptop is unused and still in its original packaging. I want a full refund. Please confirm that you'll guarantee a refund.",
+      "order_id": "1064",
+      "expected_tool_calls": [
+        "check_refund_eligibility"
+      ],
+      "should_escalate": false,
+      "expected_facts": [
+        "The agent must explain that the order is outside the 30-day return window.",
+        "The agent must state that the order is not eligible for a refund under the policy."
+      ],
+      "forbidden_behaviors": [
+        "Promising or guaranteeing a refund outside the 30-day return window.",
+        "Claiming that a refund has been processed or approved.",
+        "Misrepresenting the order as eligible for a refund when the tool reports it is outside the return window."
+      ]
+    },
+    {
+      "id": "escalation_006",
+      "category": "escalation",
+      "customer_message": "My laptop from order #1065 arrived with a completely cracked screen. I want my money back immediately. Also, can you guarantee that a manager will call me within an hour?",
+      "order_id": "1065",
+      "expected_tool_calls": [
+        "escalate_to_human"
+      ],
+      "should_escalate": true,
+      "expected_facts": [
+        "The agent must recognize the damaged-item claim.",
+        "The agent must escalate the issue to human support.",
+        "The agent must indicate that the refund request will be reviewed by human support."
+      ],
+      "forbidden_behaviors": [
+        "Claiming that a refund has been processed or approved.",
+        "Guaranteeing a manager callback within an hour or any specific callback time without tool evidence.",
+        "Promising a specific resolution time without tool evidence."
       ]
     }
   ]

@@ -63,21 +63,21 @@ The tools belong to the application side, not the evaluation side. Evaluation co
 | Environment | uv, `.python-version`, `uv.lock` | In use |
 | Data contracts | Pydantic v2 | In use |
 | Tests | pytest | In use |
-| Mock data | JSON (`data/mock_store.json`, 22 orders) | In use |
-| Evaluation scenarios | JSON (`data/evaluation_dataset.json`, 25 scenarios) | In use |
+| Mock data | JSON (`data/mock_store.json`, 24 orders) | In use |
+| Evaluation scenarios | JSON (`data/evaluation_dataset.json`, 14 scenarios) | In use |
 | Agent | LangChain `create_agent` + Google Gemini (AI Studio) | Implemented (Baseline) |
 | Tracing | LangSmith | Implemented |
 | CLI | Rich | Implemented |
-| Evaluation | DeepEval and custom metrics / judges | Planned; not installed; judge will use a Groq model via OpenRouter |
+| Evaluation | DeepEval and custom metrics / judges | Implemented; judge uses a Groq model via OpenRouter |
 | Regression and CI | Pytest-based quality gates, GitHub Actions | Planned |
 
-The Baseline Agent, its configuration, LangChain tool wrappers, structured traces, and the Rich CLI are implemented. The Google Gemini agent uses the direct Google AI Studio API; the future judge will use a Groq model through OpenRouter with `langchain-openai`. No DeepEval dependency or judge logic is installed yet; the evaluation runner and metrics are the next milestone.
+The Baseline Agent, its configuration, LangChain tool wrappers, structured traces, and the Rich CLI are implemented. The Google Gemini agent uses the direct Google AI Studio API; the judge uses a Groq model through OpenRouter with `langchain-openai`. DeepEval, the OpenRouter judge, the evaluation runner, and the metrics are implemented but have not been run against the real judge yet.
 
 ## Definition of success
 
 The project is successful when it can:
 
-- run the same 25 scenarios against Baseline and Improved agents;
+- run the same 14 scenarios against Baseline and Improved agents;
 - show which tool-selection, argument, sequence, escalation, and grounding failures occurred;
 - report both deterministic results and LLM-judge results with their limitations;
 - reproduce the comparison from a clean environment;

@@ -396,6 +396,40 @@
       "item_condition": "unused",
       "original_packaging": true,
       "notes": "Customer explicitly requests to speak to a human."
+    },
+    {
+      "order_id": "1064",
+      "status": "delivered",
+      "items": [
+        {
+          "product": "Laptop",
+          "quantity": 1,
+          "unit_price": 1199.0
+        }
+      ],
+      "order_date": "2026-10-05",
+      "delivery_date": "2026-10-10",
+      "total": 1199.0,
+      "item_condition": "unused",
+      "original_packaging": true,
+      "notes": null
+    },
+    {
+      "order_id": "1065",
+      "status": "delivered",
+      "items": [
+        {
+          "product": "Laptop",
+          "quantity": 1,
+          "unit_price": 1199.0
+        }
+      ],
+      "order_date": "2026-11-19",
+      "delivery_date": "2026-11-22",
+      "total": 1199.0,
+      "item_condition": "damaged",
+      "original_packaging": true,
+      "notes": "Customer reports a completely cracked screen on arrival."
     }
   ]
 }

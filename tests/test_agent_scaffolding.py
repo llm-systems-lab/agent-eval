@@ -8,7 +8,12 @@ import pytest
 from langchain_core.messages import AIMessage, ToolMessage
 from pydantic import ValidationError
 
-from agent.baseline_agent import BASELINE_TAG, BaselineAgent, create_baseline_agent
+from agent.baseline_agent import (
+    BASELINE_TAG,
+    SYSTEM_PROMPT,
+    BaselineAgent,
+    create_baseline_agent,
+)
 from agent.config import (
     DEFAULT_OPENROUTER_BASE_URL,
     AgentSettings,
@@ -260,8 +265,43 @@ class TestToolkit:
         with pytest.raises(ValidationError):
             tools["escalate_to_human"].invoke({"order_id": "1053"})
 
+    def test_escalate_tool_description_states_conditions(self) -> None:
+        tools = {t.name: t for t in build_customer_support_tools(store=make_store())}
+
+        description = (tools["escalate_to_human"].description or "").lower()
+
+        for keyword in (
+            "cannot be found",
+            "delivery delay",
+            "damaged",
+            "human representative",
+            "unresolved",
+        ):
+            assert keyword in description
+
 
 class TestAgentWiring:
+    def test_system_prompt_states_escalation_rules(self) -> None:
+        prompt = SYSTEM_PROMPT.lower()
+
+        assert "escalate_to_human" in SYSTEM_PROMPT
+        assert "permission" in prompt
+        for keyword in (
+            "cannot be found",
+            "delivery delay",
+            "damaged, missing, tampered",
+            "human representative",
+            "unresolved",
+        ):
+            assert keyword in prompt
+
+    def test_system_prompt_states_refund_policy(self) -> None:
+        prompt = SYSTEM_PROMPT.lower()
+
+        assert "eligibility check" in prompt
+        assert "refund has been processed" in prompt
+        assert "refund-processing tool" in prompt
+
     def _agent(self) -> BaselineAgent:
         settings = AgentSettings(google_api_key="dummy-key", model="gemini-test")
         return create_baseline_agent(
@@ -285,3 +325,16 @@ class TestAgentWiring:
         assert config["metadata"]["agent_version"] == 1
         assert config["recursion_limit"] == agent.recursion_limit
         assert config["run_name"]
+
+    def test_custom_metadata_merges_with_baseline_defaults(self) -> None:
+        settings = AgentSettings(google_api_key="dummy-key", model="gemini-test")
+        agent = create_baseline_agent(
+            settings=settings,
+            store=make_store(),
+            configure_tracing=False,
+            metadata={"scenario_id": "order_status_001"},
+        )
+
+        assert agent.metadata["scenario_id"] == "order_status_001"
+        assert agent.metadata["experiment"] == "baseline"
+        assert agent.metadata["agent_version"] == 1

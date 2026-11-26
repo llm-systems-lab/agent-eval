@@ -54,7 +54,14 @@ def build_customer_support_tools(
 
     @tool
     def escalate_to_human(reason: str, order_id: str | None = None) -> str:
-        """Escalate an issue to a human support agent. The order ID is optional."""
+        """Escalate an issue to a human support agent.
+
+        Call this (do not merely offer it or ask for permission) when any of these apply:
+        the order cannot be found after checking the customer's order ID; the customer reports a
+        delivery delay with explicit urgency or an unmet deadline; an item is damaged, missing,
+        tampered with, or cannot be verified; the customer asks for a human representative; or the
+        complaint is repeatedly unresolved. Provide a short reason; the order ID is optional.
+        """
         return cst.escalate_to_human(
             order_id, reason, registry=registry
         ).model_dump_json()

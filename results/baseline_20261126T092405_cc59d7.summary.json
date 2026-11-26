@@ -1,0 +1,44 @@
+{
+  "total": 14,
+  "successful": 14,
+  "failed": 0,
+  "scenarios_passed": 11,
+  "checks_passed": 81,
+  "checks_failed": 3,
+  "checks_error": 0,
+  "metrics_passed": 69,
+  "metrics_failed": 14,
+  "metrics_error": 1,
+  "per_category": {
+    "order_status": {
+      "total": 3,
+      "successful": 3,
+      "failed": 0,
+      "passed": 3
+    },
+    "order_details": {
+      "total": 2,
+      "successful": 2,
+      "failed": 0,
+      "passed": 2
+    },
+    "refund": {
+      "total": 4,
+      "successful": 4,
+      "failed": 0,
+      "passed": 3
+    },
+    "cancellation": {
+      "total": 2,
+      "successful": 2,
+      "failed": 0,
+      "passed": 2
+    },
+    "escalation": {
+      "total": 3,
+      "successful": 3,
+      "failed": 0,
+      "passed": 1
+    }
+  }
+}
