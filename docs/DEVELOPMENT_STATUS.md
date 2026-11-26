@@ -4,7 +4,7 @@
 
 ## Current stage
 
-The deterministic tool layer is complete and tested. The Baseline Agent is implemented with LangChain `create_agent`, Google Gemini, and LangSmith tracing, and produces structured execution traces. The evaluation runner executes the dataset sequentially with an isolated store per scenario, applies deterministic behavior checks, and saves results incrementally. DeepEval is integrated: six metrics (Answer Relevancy, Faithfulness, Contextual Precision, Contextual Recall, Tool Outcome Consistency, Business Policy Compliance) run per scenario through an OpenRouter-backed judge and are stored in the JSONL results. There is still no experiment report, regression gate, or CI workflow, and the baseline experiment has not been run yet.
+The deterministic tool layer is complete and tested. The Baseline Agent is implemented with LangChain `create_agent`, Google Gemini, and LangSmith tracing, and produces structured execution traces. The evaluation runner executes the dataset sequentially with an isolated store per scenario, applies deterministic behavior checks, and saves results incrementally. DeepEval is integrated: six metrics (Answer Relevancy, Faithfulness, Contextual Precision, Contextual Recall, Tool Outcome Consistency, Business Policy Compliance) run per scenario through an OpenRouter-backed judge and are stored in the JSONL results. CI (`.github/workflows/ci.yml`) runs Ruff and the offline unit tests on every push and on pull requests to `main`. There is still no experiment report or regression gate, and the baseline experiment has not been run yet.
 
 **Partially implemented:** `expected_facts` and `forbidden_behaviors` are scored by LLM-judge checks (`judge_checks`) using the shared OpenRouter judge, in addition to the deterministic checks for tool calls, arguments, and escalation. Judge-based checks have not been run against the real judge yet.
 
@@ -45,7 +45,7 @@ $ uvx ruff check src tests
 All checks passed!
 ```
 
-Verified locally on 2026-11-25 with Python 3.13.18. Tests use temporary copies of the mock store, mocked models and fake metrics (no API calls), and an offline `conftest.py` that disables LangSmith tracing. The real data files are not modified. The runner's plumbing was smoke-tested with `uv run eval-runner --limit 0 --no-metrics` (no scenarios, no API calls). Manual smoke runs of the Baseline Agent and the Rich CLI against Gemini confirmed streamed tool activity, grounded answers, and trace export under the `baseline` tag; in one run the minimal baseline cancelled an order without first checking its status, an expected baseline weakness rather than an artificial one. The 14-scenario baseline experiment and the DeepEval metrics have not been run. There is no CI workflow, so these results are local only.
+Verified locally on 2026-11-25 with Python 3.13.18. Tests use temporary copies of the mock store, mocked models and fake metrics (no API calls), and an offline `conftest.py` that disables LangSmith tracing. The real data files are not modified. The runner's plumbing was smoke-tested with `uv run eval-runner --limit 0 --no-metrics` (no scenarios, no API calls). Manual smoke runs of the Baseline Agent and the Rich CLI against Gemini confirmed streamed tool activity, grounded answers, and trace export under the `baseline` tag; in one run the minimal baseline cancelled an order without first checking its status, an expected baseline weakness rather than an artificial one. The 14-scenario baseline experiment and the DeepEval metrics have not been run. CI runs Ruff and pytest offline; the results above are local only.
 
 ## Milestones
 
@@ -59,13 +59,13 @@ Verified locally on 2026-11-25 with Python 3.13.18. Tests use temporary copies o
 | 6 | Improve agent behavior based on observed failures | Planned. |
 | 7 | Run Improved evaluation and compare results | Planned. |
 | 8 | Add regression testing | Planned. |
-| 9 | Integrate evaluation into GitHub Actions | Planned. |
+| 9 | Integrate evaluation into GitHub Actions | Partially implemented — `.github/workflows/ci.yml` runs Ruff and pytest on push and PRs to `main`; evaluation thresholds and judge runs remain planned. |
 | 10 | Document results and limitations | Planned. |
 
 ## What intentionally does not exist yet
 
 - No per-scenario threshold gates yet; the custom metrics report scores but do not fail the run.
-- No experiment report, regression thresholds, or GitHub Actions workflow.
+- No experiment report or regression thresholds; CI runs lint and unit tests only.
 - No baseline/improved results yet (the baseline experiment has not been run).
 - DeepEval metric scores have not been produced against the real judge.
 - No persistence for cancellation or escalation state.

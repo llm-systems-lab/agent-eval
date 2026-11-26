@@ -69,7 +69,7 @@ The tools belong to the application side, not the evaluation side. Evaluation co
 | Tracing | LangSmith | Implemented |
 | CLI | Rich | Implemented |
 | Evaluation | DeepEval and custom metrics / judges | Implemented; judge uses a Groq model via OpenRouter |
-| Regression and CI | Pytest-based quality gates, GitHub Actions | Planned |
+| Regression and CI | Pytest-based quality gates, GitHub Actions | Partially implemented; CI runs lint and unit tests |
 
 The Baseline Agent, its configuration, LangChain tool wrappers, structured traces, and the Rich CLI are implemented. The Google Gemini agent uses the direct Google AI Studio API; the judge uses a Groq model through OpenRouter with `langchain-openai`. DeepEval, the OpenRouter judge, the evaluation runner, and the metrics are implemented but have not been run against the real judge yet.
 

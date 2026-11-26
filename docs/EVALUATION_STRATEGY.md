@@ -2,7 +2,7 @@
 
 ## Status
 
-The Baseline Agent, the evaluation runner, deterministic behavior checks, and the DeepEval metric layer are implemented. There is no experiment report, regression gate, or CI job yet, and no experiment has been run. This document defines how the three layers are implemented and evaluated.
+The Baseline Agent, the evaluation runner, deterministic behavior checks, and the DeepEval metric layer are implemented. CI runs Ruff and the offline unit tests but no live evaluation or judge metrics. There is no experiment report or regression gate yet, and no experiment has been run. This document defines how the three layers are implemented and evaluated.
 
 ## The fixed evaluation dataset
 

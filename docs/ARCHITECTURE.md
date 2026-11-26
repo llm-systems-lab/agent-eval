@@ -266,7 +266,7 @@ The following are requirements for later milestones, not current code.
 
 ### Reports, regression, and CI
 
-Experiment reports will summarize aggregate and per-scenario results, including failures and metric disagreements. Regression gates will compare against stored thresholds or a prior run. GitHub Actions will run unit tests and evaluation checks; no workflow exists yet.
+Experiment reports will summarize aggregate and per-scenario results, including failures and metric disagreements. Regression gates will compare against stored thresholds or a prior run. GitHub Actions (`.github/workflows/ci.yml`) runs Ruff and the offline unit test suite on every push and on pull requests to `main`; no live evaluation or judge metrics run in CI.
 
 ## Boundaries that must survive later changes
 
