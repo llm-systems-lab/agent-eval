@@ -227,6 +227,18 @@ class TestDataset:
             "escalation",
         }
 
+    def test_order_status_005_rewards_available_information(self) -> None:
+        scenarios = {scenario.id: scenario for scenario in load_scenarios()}
+        scenario = scenarios["order_status_005"]
+
+        facts = " ".join(scenario.expected_facts)
+        assert "report that the order has shipped" in facts
+        assert "no delivery date is currently available" in facts
+
+        forbidden = " ".join(scenario.forbidden_behaviors)
+        assert "Inventing a delay reason" in forbidden
+        assert "callback" in forbidden
+
 
 class TestBehaviorChecks:
     def _run(self, tool_calls: list[ToolCallRecord]) -> AgentRun:

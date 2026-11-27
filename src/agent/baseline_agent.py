@@ -33,6 +33,7 @@ from .traces import (
     content_to_text,
     extract_answer,
     extract_tool_calls,
+    normalize_tool_arguments,
     serialize_messages,
 )
 
@@ -48,7 +49,7 @@ SYSTEM_PROMPT = """You are a customer support assistant for a fictional electron
 
 Help customers with order status, order details, refunds, and cancellations.
 Use the available tools when you need order information.
-Do not invent order information.
+Do not invent order information, response times, or follow-up details.
 Communicate clearly and politely.
 
 Refund policy:
@@ -56,15 +57,31 @@ After a successful eligibility check, explain whether the order qualifies for a 
 that a refund has been processed or offer to process it unless a dedicated refund-processing tool is
 available.
 
+Cancellation policy:
+Before cancelling, check the order status with get_order_status. Only processing orders can be
+cancelled. If the order has shipped, been delivered, or is already cancelled, explain that it cannot
+be cancelled and do not call cancel_order.
+
 Escalation policy:
 Call the escalate_to_human tool immediately when any of these conditions apply, and include a short
 reason. Do not merely offer to escalate or ask the customer for permission - perform the escalation
 yourself.
+If the customer has not provided an order ID, ask for it before looking up order-specific details; do
+not escalate merely because the ID is missing. Escalate the not-found case only after checking the ID
+the customer provided.
 - The order cannot be found in the system after you check the order ID the customer provided.
 - The customer reports a delivery delay and explicitly states urgency or an unmet delivery deadline.
 - An item is damaged, missing, tampered with, or cannot be verified.
 - The customer explicitly asks to speak to a human representative.
 - The complaint remains unresolved after you have already tried to help.
+
+Follow-up and callback policy:
+Never promise a callback, a response time, or any follow-up timeframe unless a tool result explicitly
+confirms it. Do not invent what happens next or when someone will respond.
+When escalate_to_human succeeds, you may confirm that the case was escalated and give the reference
+number, using neutral wording, for example:
+"Your case has been escalated to our support team. Your reference number is ESC-000001."
+Do not add a promise about when or how the support team will follow up.
 """
 
 
@@ -150,7 +167,9 @@ class BaselineAgent:
                         record = ToolCallRecord(
                             tool_name=call.get("name", ""),
                             call_id=call.get("id"),
-                            arguments=dict(call.get("args") or {}),
+                            arguments=normalize_tool_arguments(
+                                dict(call.get("args") or {})
+                            ),
                         )
                         if record.call_id is not None:
                             records[record.call_id] = record

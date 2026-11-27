@@ -6,7 +6,7 @@ Persistent instructions for Kilo Code sessions in this repository.
 
 AgentEval builds and evaluates a tool-using AI Customer Support Agent for a fictional electronics store. The end goal is a repeatable evaluation framework: a Baseline Agent, an Improved Agent, DeepEval-based metrics, regression checks, and CI.
 
-**Current state:** only the deterministic tool layer, mock data, evaluation dataset, unit tests, and uv project setup exist. There is no LLM agent, evaluation runner, DeepEval integration, experiment report, or CI workflow yet. Read `docs/DEVELOPMENT_STATUS.md` before starting work and `docs/ARCHITECTURE.md` before changing structure.
+**Current state:** the deterministic tool layer, mock data, evaluation dataset, unit tests, the Baseline Agent (LangChain `create_agent` + Google Gemini with LangSmith tracing, a Rich CLI, and structured traces), the evaluation runner with DeepEval metrics and an OpenRouter judge, deterministic checks, regression comparison, and CI all exist and are covered by tests. Baseline and improved experiments have been run and stored under `results/`; a standalone experiment report and per-scenario threshold gates do not exist yet. Read `docs/DEVELOPMENT_STATUS.md` before starting work and `docs/ARCHITECTURE.md` before changing structure.
 
 ## Hard boundaries
 
@@ -24,18 +24,34 @@ AgentEval builds and evaluates a tool-using AI Customer Support Agent for a fict
 
 - Python 3.13 (pinned in `.python-version`), managed with `uv`.
 - Pydantic v2 for data and tool contracts; pytest for tests.
-- Runtime dependency: `pydantic`. Dev dependency: `pytest`.
+- Runtime dependencies: `pydantic`, `langchain`, `langchain-google-genai`, `langchain-openai`, `langsmith`, `rich`, `python-dotenv`, `deepeval`. Dev dependencies: `pytest`, `ruff`.
 - `src/` layout; pytest uses `pythonpath = ["src"]` from `pyproject.toml`.
 
 ```
-data/                         mock store (22 orders) and fixed evaluation dataset (25 scenarios)
+data/                         mock store (24 orders) and fixed evaluation dataset (14 scenarios)
 src/agent/tools/models.py     Pydantic data and result models
 src/agent/tools/store.py      mock data loading and in-memory OrderStore
 src/agent/tools/customer_support_tools.py
                               five tool functions and EscalationRegistry
+src/agent/baseline_agent.py   LangChain create_agent + Gemini agent
+src/agent/toolkit.py          LangChain tool wrappers
+src/agent/traces.py           structured AgentRun / ToolCallRecord
+src/agent/cli.py              Rich terminal interface
+src/agent/config.py           agent / judge / LangSmith settings
+src/agent/scenarios.py        evaluation dataset loader
+src/agent/behavior_checks.py  deterministic checks
+src/agent/judge_checks.py     expected_facts / forbidden_behaviors judging
+src/agent/judge.py            OpenRouter-backed DeepEval judge
+src/agent/metric_evaluation.py, src/agent/custom_metrics.py
+                              DeepEval standard and custom metrics
+src/agent/evaluation_runner.py
+                              sequential runner, resume, rerun, summary
+src/agent/regression.py       baseline-vs-candidate comparison
 tests/test_customer_support_tools.py
                               38 unit tests for the tool layer
+tests/                        agent, runner, metric, judge-check, and regression tests
 docs/                         project, architecture, evaluation, and status documentation
+results/                      evaluation run outputs (.jsonl + .summary.json)
 ```
 
 ## Existing tool interfaces
@@ -53,10 +69,12 @@ All five accept optional dependency injection (`store=`, or `registry=` for esca
 ## Commands
 
 ```bash
-uv sync                 # install/refresh the locked environment
-uv run pytest -q        # required verification for every code change
-uv run pytest -q tests/test_customer_support_tools.py
-uvx ruff check src tests  # optional lint check; no committed lint config yet
+uv sync                    # install/refresh the locked environment
+uv run pytest -q           # required verification for every code change
+uvx ruff check src tests   # lint check
+uv run agent-cli "..."     # run the agent once (Rich CLI); no message starts a session
+uv run eval-runner         # run the evaluation (--no-metrics for deterministic only)
+uv run eval-regression --baseline <path|dir> --candidate <path|dir>  # compare runs
 ```
 
 ## Python standards

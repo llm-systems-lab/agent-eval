@@ -115,23 +115,21 @@ def build_test_case(scenario: Scenario, run: AgentRun) -> Any:
 
 def build_metrics(judge: Any) -> list[tuple[str, Any]]:
     """Instantiate the standard and custom DeepEval metrics bound to the judge."""
-    from deepeval.metrics import (
-        ArgumentCorrectnessMetric,
-        StepEfficiencyMetric,
-        TaskCompletionMetric,
-        ToolCorrectnessMetric,
-    )
+    from deepeval.metrics import ToolCorrectnessMetric
 
     from .custom_metrics import (
         BusinessPolicyComplianceMetric,
         ToolOutcomeConsistencyMetric,
+        policy_aware_argument_correctness_metric,
+        policy_aware_step_efficiency_metric,
+        policy_aware_task_completion_metric,
     )
 
     return [
-        ("Tool Correctness", ToolCorrectnessMetric(model=judge)),
-        ("Argument Correctness", ArgumentCorrectnessMetric(model=judge)),
-        ("Task Completion", TaskCompletionMetric(model=judge)),
-        ("Step Efficiency", StepEfficiencyMetric(model=judge)),
+        ("Tool Correctness", ToolCorrectnessMetric(model=judge, async_mode=False)),
+        ("Argument Correctness", policy_aware_argument_correctness_metric(judge)),
+        ("Task Completion", policy_aware_task_completion_metric(judge)),
+        ("Step Efficiency", policy_aware_step_efficiency_metric(judge)),
         ("Tool Outcome Consistency", ToolOutcomeConsistencyMetric(judge)),
         ("Business Policy Compliance", BusinessPolicyComplianceMetric(judge)),
     ]

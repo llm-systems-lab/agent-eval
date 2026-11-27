@@ -8,7 +8,7 @@ The agent under test is an AI Customer Support Agent for a fictional electronics
 
 Tool-using LLM agents can produce a fluent answer while still behaving incorrectly: calling the wrong tool, passing bad arguments, skipping required checks, or promising an outcome the business rules do not allow. A customer support agent is a useful demonstration because its correct behavior depends on real order data and explicit policies such as return windows and cancellation rules.
 
-The repository now implements the deterministic foundation (a mock store, a validated data access layer, five customer support tools, and unit tests) and a Baseline Agent built with LangChain `create_agent` over a Google Gemini model, with LangSmith tracing and structured execution traces. The evaluation runner, judge, and comparison framework are planned next. See `docs/DEVELOPMENT_STATUS.md` for the verified state.
+The repository implements the deterministic foundation (a mock store, a validated data access layer, five customer support tools, and unit tests), a Baseline Agent built with LangChain `create_agent` over a Google Gemini model (LangSmith tracing and structured execution traces), the evaluation runner with an OpenRouter-backed DeepEval judge, deterministic and LLM-judge checks, and a regression comparator wired into CI. Baseline and improved experiments have been run and stored under `results/`. See `docs/DEVELOPMENT_STATUS.md` for the verified state.
 
 ## What this project demonstrates
 
@@ -18,7 +18,7 @@ The repository now implements the deterministic foundation (a mock store, a vali
 - Building a fixed, behavior-focused evaluation dataset.
 - Evaluating a tool-using agent beyond its final prose.
 - Comparing a Baseline Agent with an Improved Agent under the same scenarios.
-- Turning failures into regression checks and CI gates (planned).
+- Turning failures into regression checks and CI gates.
 - Investigating individual failures instead of reporting only aggregate scores.
 
 The intended audience is AI Engineer / Applied AI Engineer recruiters and engineering teams. The project should read as an honest engineering exercise: measured outcomes, documented limitations, and reproducible commands, not inflated claims.
@@ -50,8 +50,8 @@ Non-goals at the current stage: production customer support, real payments or re
 
 | System | Responsibility | Current status |
 | --- | --- | --- |
-| Agent under test | Reads a customer message, chooses tools, supplies arguments, and writes the customer response. | Implemented (Baseline; not yet evaluated) |
-| Evaluation framework | Runs fixed scenarios, records traces, applies deterministic checks and judge metrics, compares runs, and reports results. | Planned |
+| Agent under test | Reads a customer message, chooses tools, supplies arguments, and writes the customer response. | Implemented (Baseline); evaluated on 14 scenarios |
+| Evaluation framework | Runs fixed scenarios, records traces, applies deterministic checks and judge metrics, compares runs, and reports results. | Implemented |
 
 The tools belong to the application side, not the evaluation side. Evaluation code must not be embedded in tools, and tools must not know which scenario is running.
 
@@ -69,9 +69,9 @@ The tools belong to the application side, not the evaluation side. Evaluation co
 | Tracing | LangSmith | Implemented |
 | CLI | Rich | Implemented |
 | Evaluation | DeepEval and custom metrics / judges | Implemented; judge uses a Groq model via OpenRouter |
-| Regression and CI | Pytest-based quality gates, GitHub Actions | Partially implemented; CI runs lint and unit tests, and a manual workflow runs the live evaluation against the committed baseline |
+| Regression and CI | Pytest-based quality gates, GitHub Actions | Implemented; CI runs lint and unit tests, and a manual workflow runs the live evaluation and regression gate against a baseline |
 
-The Baseline Agent, its configuration, LangChain tool wrappers, structured traces, and the Rich CLI are implemented. The Google Gemini agent uses the direct Google AI Studio API; the judge uses a Groq model through OpenRouter with `langchain-openai`. DeepEval, the OpenRouter judge, the evaluation runner, and the metrics are implemented but have not been run against the real judge yet.
+The Baseline Agent, its configuration, LangChain tool wrappers, structured traces, and the Rich CLI are implemented. The Google Gemini agent uses the direct Google AI Studio API; the judge uses a Groq model through OpenRouter with `langchain-openai`. DeepEval, the OpenRouter judge, the evaluation runner, and the metrics are implemented and have been run against the real judge; baseline and improved results are stored under `results/`.
 
 ## Definition of success
 
@@ -83,4 +83,4 @@ The project is successful when it can:
 - reproduce the comparison from a clean environment;
 - fail a regression check when a known-good behavior breaks.
 
-That comparison has not been run yet; no Baseline or Improved results exist.
+Baseline and improved comparison runs have been executed and stored under `results/`; because the dataset changed between them, the comparison is not perfectly controlled. A standalone experiment report is still pending.

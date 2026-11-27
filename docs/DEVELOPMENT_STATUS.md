@@ -1,12 +1,12 @@
 # Development Status
 
-**As of:** 2026-11-25
+**As of:** 2026-11-27
 
 ## Current stage
 
-The deterministic tool layer is complete and tested. The Baseline Agent is implemented with LangChain `create_agent`, Google Gemini, and LangSmith tracing, and produces structured execution traces. The evaluation runner executes the dataset sequentially with an isolated store per scenario, applies deterministic behavior checks, and saves results incrementally. DeepEval is integrated: six metrics (Tool Correctness, Argument Correctness, Task Completion, Step Efficiency, Tool Outcome Consistency, Business Policy Compliance) run per scenario through an OpenRouter-backed judge and are stored in the JSONL results. CI (`.github/workflows/ci.yml`) runs Ruff and the offline unit tests on every push and on pull requests to `main`. There is still no experiment report or regression gate, and the baseline experiment has not been run yet.
+The deterministic tool layer is complete and tested. The Baseline Agent is implemented with LangChain `create_agent`, Google Gemini, and LangSmith tracing, and produces structured execution traces. The evaluation runner executes the dataset sequentially with an isolated store per scenario, applies deterministic behavior checks and LLM-judge checks, and saves results incrementally with resume and single-scenario rerun. DeepEval is integrated: six metrics (Tool Correctness, Argument Correctness, Task Completion, Step Efficiency, Tool Outcome Consistency, Business Policy Compliance) run per scenario through an OpenRouter-backed judge and are stored in the JSONL results. `src/agent/regression.py` (`uv run eval-regression`) compares a candidate run against a baseline. CI (`.github/workflows/ci.yml`) runs Ruff and the offline unit tests on every push and on pull requests to `main`; `.github/workflows/llm-evaluation.yml` runs the live evaluation manually and fails on regressions. Baseline and improved experiments have been run and stored under `results/`. There is still no standalone experiment report and no per-scenario threshold gates.
 
-**Partially implemented:** `expected_facts` and `forbidden_behaviors` are scored by LLM-judge checks (`judge_checks`) using the shared OpenRouter judge, in addition to the deterministic checks for tool calls, arguments, and escalation. Judge-based checks have not been run against the real judge yet.
+**Partially implemented:** the baseline and improved runs used different revisions of `data/evaluation_dataset.json`, so the comparison is not perfectly controlled (see `docs/EVALUATION_STRATEGY.md`). `expected_facts` and `forbidden_behaviors` are scored by LLM-judge checks (`judge_checks`) using the shared OpenRouter judge, in addition to the deterministic checks for tool calls, arguments, escalation, and the cancellation precondition; these judge checks have now run against the real judge and occasionally return infrastructure errors (structured-output and length-limit failures), recorded as `error`.
 
 ## Completed components
 
@@ -27,53 +27,57 @@ The deterministic tool layer is complete and tested. The Baseline Agent is imple
 | Baseline Agent | `src/agent/baseline_agent.py`: `create_agent` graph over the tools with a Google Gemini model; `run` and streaming `stream`. |
 | CLI | `src/agent/cli.py`: Rich title panel, thinking spinner, streamed tool activity, tool-call table, answer panel, graceful errors, interactive loop. |
 | Scenario loader | `src/agent/scenarios.py`: read-only loader for `data/evaluation_dataset.json`. |
-| Behavior checks | `src/agent/behavior_checks.py`: deterministic checks for tool calls, arguments, and escalation; facts/forbidden handled by the DeepEval metrics. |
+| Behavior checks | `src/agent/behavior_checks.py`: deterministic checks for expected tool calls, arguments, escalation, and the cancellation precondition; `expected_facts`/`forbidden_behaviors` handled by `judge_checks`. |
 | Evaluation runner | `src/agent/evaluation_runner.py`: sequential execution with per-scenario isolation, incremental JSONL saving, resume from an existing results file, single-scenario rerun that replaces its record, per-scenario timeout, live progress output, DeepEval metrics, and summary. |
 | Judge model | `src/agent/judge.py`: `OpenRouterJudge` (`DeepEvalBaseLLM`) via `langchain-openai` on OpenRouter, from `JudgeSettings`. |
-| DeepEval metrics | `src/agent/metric_evaluation.py`: Tool Correctness, Argument Correctness, Task Completion, Step Efficiency; `src/agent/custom_metrics.py`: Tool Outcome Consistency and Business Policy Compliance (both `GEval`); scores/errors stored per scenario. |
+| DeepEval metrics | `src/agent/metric_evaluation.py`: Tool Correctness, Argument Correctness (policy-aware prompt), Task Completion (policy-aware prompt), Step Efficiency (calibrated prompt); `src/agent/custom_metrics.py`: Tool Outcome Consistency and Business Policy Compliance (both `GEval`); scores/errors stored per scenario. |
 | Judge checks | `src/agent/judge_checks.py`: LLM-judge checks for `expected_facts` and `forbidden_behaviors` via the shared OpenRouter judge; `pass`/`fail`/`error`. |
-| Unit tests | 38 tool tests (`tests/test_customer_support_tools.py`); 20 scaffolding (`tests/test_agent_scaffolding.py`); 8 orchestration (`tests/test_baseline_agent.py`); 2 CLI (`tests/test_cli.py`); 38 evaluation (`tests/test_evaluation_runner.py`); 17 metric (`tests/test_metric_evaluation.py`); 11 custom metric (`tests/test_custom_metrics.py`); 11 judge-check (`tests/test_judge_checks.py`); 16 regression (`tests/test_regression.py`). |
-| Documentation | `AGENTS.md`, `docs/PROJECT_CONTEXT.md`, `docs/ARCHITECTURE.md`, `docs/EVALUATION_STRATEGY.md`, this file. |
+| Unit tests | 38 tool tests (`tests/test_customer_support_tools.py`); 29 scaffolding (`tests/test_agent_scaffolding.py`); 8 orchestration (`tests/test_baseline_agent.py`); 2 CLI (`tests/test_cli.py`); 39 evaluation (`tests/test_evaluation_runner.py`); 17 metric (`tests/test_metric_evaluation.py`); 31 custom metric (`tests/test_custom_metrics.py`); 11 judge-check (`tests/test_judge_checks.py`); 16 regression (`tests/test_regression.py`); 191 tests total. |
+| Documentation | `README.md`, `AGENTS.md`, `docs/PROJECT_CONTEXT.md`, `docs/ARCHITECTURE.md`, `docs/EVALUATION_STRATEGY.md`, this file. |
+| Baseline experiment | `results/baseline_20261126T132600_cf9726.jsonl`/`.summary.json`: 14 scenarios; 83 checks passed, 1 failed; 72 metrics passed, 12 failed. |
+| Improved experiment | `results/improvements_20261127T082918_e85922.jsonl`/`.summary.json`: 14 scenarios; 75 checks passed, 8 failed, 1 check error; 80 metrics passed, 4 failed, 0 metric errors. |
+| Regression comparison | `src/agent/regression.py` (`uv run eval-regression`): baseline-vs-candidate comparison of scenarios, checks, and metrics with a configurable score tolerance; metric errors reported separately. |
 
 ## Verification
 
 ```text
 $ uv run pytest -q
-161 passed in 7.39s
+191 passed in 6.41s
 
 $ uvx ruff check src tests
 All checks passed!
 ```
 
-Verified locally on 2026-11-25 with Python 3.13.18. Tests use temporary copies of the mock store, mocked models and fake metrics (no API calls), and an offline `conftest.py` that disables LangSmith tracing. The real data files are not modified. The runner's plumbing was smoke-tested with `uv run eval-runner --limit 0 --no-metrics` (no scenarios, no API calls). Manual smoke runs of the Baseline Agent and the Rich CLI against Gemini confirmed streamed tool activity, grounded answers, and trace export under the `baseline` tag; in one run the minimal baseline cancelled an order without first checking its status, an expected baseline weakness rather than an artificial one. The 14-scenario baseline experiment and the DeepEval metrics have not been run. CI runs Ruff and pytest offline; the results above are local only.
+Verified locally on 2026-11-27 with Python 3.13. Tests use temporary copies of the mock store, mocked models and fake metrics (no API calls), and an offline `conftest.py` that disables LangSmith tracing; the real data files are not modified. Manual smoke runs of the Baseline Agent and the Rich CLI against Gemini confirmed streamed tool activity, grounded answers, and trace export under the `baseline` tag. The baseline experiment (14 scenarios) and an improved experiment (14 scenarios) have been run against Gemini with the DeepEval metrics and the OpenRouter judge, and their results are stored under `results/`. A targeted 3-scenario run after the latest policy changes passed 3/3 scenarios, 18/18 checks, and 18/18 metrics. Running the live evaluation requires `GOOGLE_API_KEY` and, for metrics, `OPENROUTER_API_KEY`; CI runs Ruff and pytest offline. The baseline and improved runs used different dataset revisions, so the comparison is not perfectly controlled. The offline test/lint results above are the authoritative local verification.
 
 ## Milestones
 
 | # | Milestone | Status |
 | --- | --- | --- |
 | 1 | Complete customer support tools and unit tests | **Completed** — five tools implemented; 38 tests pass. |
-| 2 | Implement Baseline Agent | **Completed** — minimal-prompt `create_agent` + Gemini, LangSmith tracing with `baseline` tag and metadata, structured `AgentRun` traces, Rich CLI, 26 agent/CLI tests (mocked, no API calls). Agent behavior is not yet evaluated. |
-| 3 | Implement the evaluation runner | **Completed** — loader, deterministic checks, sequential runner with per-scenario isolation, incremental saving, resume, single-scenario rerun, per-scenario timeout, progress, summary, metrics integration, 38 tests. Not yet run against Gemini. |
-| 4 | Implement the three evaluation layers | **In progress** — Layer 2 deterministic checks, Layer 1 DeepEval metrics (Tool Correctness, Argument Correctness, Task Completion, Step Efficiency, Tool Outcome Consistency, Business Policy Compliance), and Layer 1 judge checks for expected facts/forbidden behaviors are implemented via an OpenRouter judge; the judge has not been run yet. Layer 3 reliability is not started. |
-| 5 | Run and analyze Baseline evaluation | **Next** — awaits approval to run the 14 scenarios against Gemini. |
-| 6 | Improve agent behavior based on observed failures | Planned. |
-| 7 | Run Improved evaluation and compare results | Planned. |
-| 8 | Add regression testing | **Implemented** — `src/agent/regression.py` compares a candidate run against a committed baseline by scenario, check, and metric, with a configurable score tolerance; metric errors are reported separately. Not yet run against a live candidate. |
-| 9 | Integrate evaluation into GitHub Actions | Partially implemented — `.github/workflows/ci.yml` runs Ruff and pytest on push and PRs to `main`; `.github/workflows/llm-evaluation.yml` runs the live evaluation manually and fails on regressions. |
-| 10 | Document results and limitations | Planned. |
+| 2 | Implement Baseline Agent | **Completed** — `create_agent` + Gemini, LangSmith tracing with `baseline` tag and metadata, structured `AgentRun` traces, Rich CLI, 39 agent/CLI tests (mocked, no API calls). |
+| 3 | Implement the evaluation runner | **Completed** — loader, deterministic checks, sequential runner with per-scenario isolation, incremental saving, resume, single-scenario rerun, per-scenario timeout, progress, summary, metrics integration, 39 tests. Has since run against Gemini (milestone 5). |
+| 4 | Implement the three evaluation layers | **Implemented** — Layer 2 deterministic checks, Layer 1 DeepEval metrics (Tool Correctness, Argument Correctness, Task Completion, Step Efficiency, Tool Outcome Consistency, Business Policy Compliance), and Layer 1 judge checks for expected facts/forbidden behaviors, all via an OpenRouter judge that has now been run against live results. Layer 3 reliability (regression comparison) is implemented in milestones 8 and 9. |
+| 5 | Run and analyze Baseline evaluation | **Completed** — the baseline experiment ran all 14 scenarios against Gemini with metrics; results in `results/baseline_20261126T132600_cf9726.*` (83 checks passed / 1 failed; 72 metrics passed / 12 failed). |
+| 6 | Improve agent behavior based on observed failures | **In progress** — an improved prompt/policy revision was evaluated as a labeled run; a standalone experiment report is still pending. |
+| 7 | Run Improved evaluation and compare results | **Completed** — an improved experiment ran all 14 scenarios; results in `results/improvements_20261127T082918_e85922.*` (75 checks passed / 8 failed / 1 check error; 80 metrics passed / 4 failed / 0 metric errors). Comparison caveat: the dataset differed between the baseline and improved runs. |
+| 8 | Add regression testing | **Completed** — `src/agent/regression.py` compares a candidate run against a baseline by scenario, check, and metric, with a configurable score tolerance; metric errors are reported separately and have been compared against live results. |
+| 9 | Integrate evaluation into GitHub Actions | **Completed** — `.github/workflows/ci.yml` runs Ruff and pytest on push and PRs to `main`; `.github/workflows/llm-evaluation.yml` runs the live evaluation manually and fails on regressions. |
+| 10 | Document results and limitations | **In progress** — `README.md`, this file, and the strategy/architecture docs record the current state and limitations; a dedicated experiment report is still pending. |
 
 ## What intentionally does not exist yet
 
 - No per-scenario threshold gates yet; the custom metrics report scores but do not fail the run.
-- No experiment report; the regression gate compares against the committed baseline only when the manual LLM-evaluation workflow is run.
-- No baseline/improved results yet (the baseline experiment has not been run).
-- DeepEval metric scores have not been produced against the real judge.
+- No standalone experiment report; the regression gate compares against a baseline only when the manual LLM-evaluation workflow is run.
+- The baseline and improved runs used different revisions of `data/evaluation_dataset.json`, so the comparison is not perfectly controlled.
+- No committed/frozen baseline by default; `results/` currently holds the baseline and the latest improved run.
+- DeepEval metric scores are produced against the real judge, but vary with model, prompt, and sampling, and occasionally error (structured-output and length-limit failures).
 - No persistence for cancellation or escalation state.
 - No multi-turn conversation state; the agent handles one message per run.
 
 ## Immediate next step
 
-Milestone 5: run the baseline experiment across all 14 scenarios with `uv run eval-runner --label baseline` (awaiting explicit approval before running against Gemini and the OpenRouter judge). Use `--limit` to control API usage and `--no-metrics` for a deterministic-only pass. Then analyze the deterministic checks, the DeepEval metric scores, and the per-category summary.
+Produce the experiment report. The baseline and improved experiments are complete; the next step is to explain the per-scenario failures and metric deltas, add per-scenario thresholds, and re-run baseline and improved on an identical dataset revision so the comparison is fully controlled. Use `--limit` to control API usage and `--no-metrics` for a deterministic-only pass.
 
 ## Documentation maintenance
 

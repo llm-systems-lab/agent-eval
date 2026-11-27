@@ -23,7 +23,13 @@ from agent.config import (
 )
 from agent.toolkit import build_customer_support_tools
 from agent.tools import DEFAULT_DATA_PATH, EscalationRegistry, OrderStore
-from agent.traces import extract_answer, extract_tool_calls, serialize_messages
+from agent.tools import customer_support_tools as cst
+from agent.traces import (
+    extract_answer,
+    extract_tool_calls,
+    normalize_tool_arguments,
+    serialize_messages,
+)
 
 RAW_STORE = json.loads(DEFAULT_DATA_PATH.read_text(encoding="utf-8"))
 REFERENCE_DATE = date(2026, 11, 24)
@@ -193,6 +199,68 @@ class TestTraces:
         assert records[0].error == "boom"
         assert records[0].result is None
 
+    def test_normalize_tool_arguments_strips_leading_hash(self) -> None:
+        assert normalize_tool_arguments({"order_id": "#1053"}) == {"order_id": "1053"}
+        assert normalize_tool_arguments({"order_id": "1053"}) == {"order_id": "1053"}
+        assert normalize_tool_arguments({"order_id": " #1053 "}) == {
+            "order_id": "1053"
+        }
+
+    def test_normalize_tool_arguments_leaves_other_arguments(self) -> None:
+        assert normalize_tool_arguments({"reason": "x"}) == {"reason": "x"}
+        assert normalize_tool_arguments({"order_id": None}) == {"order_id": None}
+
+    def test_extract_tool_calls_normalizes_order_id(self) -> None:
+        with_hash = extract_tool_calls(
+            [
+                AIMessage(
+                    content="",
+                    tool_calls=[
+                        {
+                            "name": "get_order_status",
+                            "args": {"order_id": "#1042"},
+                            "id": "c",
+                        }
+                    ],
+                )
+            ]
+        )
+        without_hash = extract_tool_calls(
+            [
+                AIMessage(
+                    content="",
+                    tool_calls=[
+                        {
+                            "name": "get_order_status",
+                            "args": {"order_id": "1042"},
+                            "id": "c",
+                        }
+                    ],
+                )
+            ]
+        )
+
+        assert with_hash[0].arguments["order_id"] == "1042"
+        assert without_hash[0].arguments["order_id"] == "1042"
+
+    def test_serialize_messages_normalizes_order_id(self) -> None:
+        serialized = serialize_messages(
+            [
+                AIMessage(
+                    content="",
+                    tool_calls=[
+                        {
+                            "name": "get_order_status",
+                            "args": {"order_id": "#1042"},
+                            "id": "c",
+                        }
+                    ],
+                )
+            ]
+        )
+
+        assert serialized[0]["tool_calls"][0]["args"]["order_id"] == "1042"
+
 
 class TestToolkit:
     def test_exposes_expected_tool_names(self) -> None:
@@ -213,6 +281,53 @@ class TestToolkit:
 
         assert result["success"] is True
         assert result["status"] == "processing"
+
+    def test_toolkit_normalizes_order_id_before_calling_tool(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        captured: dict[str, object] = {}
+        real = cst.get_order_status
+
+        def spy(order_id: str, *, store: OrderStore | None = None) -> object:
+            captured["order_id"] = order_id
+            return real(order_id, store=store)
+
+        monkeypatch.setattr(cst, "get_order_status", spy)
+        tools = {t.name: t for t in build_customer_support_tools(store=make_store())}
+
+        result = json.loads(tools["get_order_status"].invoke({"order_id": "#1042"}))
+
+        assert captured["order_id"] == "1042"
+        assert result["status"] == "processing"
+
+    def test_toolkit_normalizes_escalation_order_id(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        captured: dict[str, object] = {}
+        real = cst.escalate_to_human
+
+        def spy(
+            order_id: str | None,
+            reason: str,
+            *,
+            registry: EscalationRegistry | None = None,
+        ) -> object:
+            captured["order_id"] = order_id
+            return real(order_id, reason, registry=registry)
+
+        monkeypatch.setattr(cst, "escalate_to_human", spy)
+        tools = {
+            t.name: t
+            for t in build_customer_support_tools(
+                store=make_store(), registry=EscalationRegistry()
+            )
+        }
+
+        tools["escalate_to_human"].invoke(
+            {"reason": "damaged item", "order_id": "#1053"}
+        )
+
+        assert captured["order_id"] == "1053"
 
     def test_cancel_mutates_injected_store(self) -> None:
         store = make_store()
@@ -301,6 +416,40 @@ class TestAgentWiring:
         assert "eligibility check" in prompt
         assert "refund has been processed" in prompt
         assert "refund-processing tool" in prompt
+
+    def test_order_status_prompt_forbids_invented_times(self) -> None:
+        prompt = " ".join(SYSTEM_PROMPT.lower().split())
+
+        assert (
+            "do not invent order information, response times, or follow-up details"
+            in prompt
+        )
+        assert (
+            "never promise a callback, a response time, or any follow-up timeframe"
+            in prompt
+        )
+
+    def test_damaged_item_refund_prompt_forbids_callback_promises(self) -> None:
+        prompt = " ".join(SYSTEM_PROMPT.lower().split())
+
+        assert "never promise a callback" in prompt
+        assert "unless a tool result explicitly confirms it" in prompt
+        assert "do not invent what happens next or when someone will respond" in prompt
+        assert (
+            "do not add a promise about when or how the support team will follow up"
+            in prompt
+        )
+
+    def test_human_escalation_prompt_allows_confirmation_with_reference(self) -> None:
+        prompt = " ".join(SYSTEM_PROMPT.lower().split())
+
+        assert "when escalate_to_human succeeds" in prompt
+        assert "confirm that the case was escalated" in prompt
+        assert "reference number" in prompt
+        assert (
+            "your case has been escalated to our support team. "
+            "your reference number is esc-000001."
+        ) in prompt
 
     def _agent(self) -> BaselineAgent:
         settings = AgentSettings(google_api_key="dummy-key", model="gemini-test")

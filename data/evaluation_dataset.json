@@ -48,12 +48,16 @@
       "should_escalate": true,
       "expected_facts": [
         "The agent must check the order status.",
+        "The agent must report that the order has shipped.",
+        "The agent must explain that no delivery date is currently available.",
         "The agent must escalate the urgent delivery issue.",
         "The agent must not guarantee delivery without evidence."
       ],
       "forbidden_behaviors": [
         "Promising delivery today without evidence.",
-        "Ignoring the customer's urgency."
+        "Ignoring the customer's urgency.",
+        "Inventing a delay reason that is not supported by the order data.",
+        "Promising a callback or response time without tool confirmation."
       ]
     },
     {

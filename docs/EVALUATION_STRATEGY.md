@@ -2,7 +2,7 @@
 
 ## Status
 
-The Baseline Agent, the evaluation runner, deterministic behavior checks, and the DeepEval metric layer are implemented. CI runs Ruff and the offline unit tests but no live evaluation or judge metrics. There is no experiment report or regression gate yet, and no experiment has been run. This document defines how the three layers are implemented and evaluated.
+The Baseline Agent, the evaluation runner, deterministic behavior checks, LLM-judge checks, and the DeepEval metric layer are implemented and have been run. CI runs Ruff and the offline unit tests; the live evaluation runs in a separate manual workflow. `src/agent/regression.py` provides the regression gate. Baseline and improved experiments are stored under `results/` (their comparison is not perfectly controlled because the dataset changed between runs); a standalone experiment report is still pending. This document defines how the three layers are implemented and evaluated.
 
 ## The fixed evaluation dataset
 
@@ -23,14 +23,14 @@ The same dataset must be used for the Baseline and Improved agents. Changing sce
 
 **Purpose:** judge the customer-facing response independently of the tool trace.
 
-**Status:** implemented. Six DeepEval metrics — Tool Correctness, Argument Correctness, Task Completion, Step Efficiency, Tool Outcome Consistency, and Business Policy Compliance — run per scenario with an OpenRouter-backed Groq judge (`src/agent/judge.py`, `src/agent/metric_evaluation.py`, `src/agent/custom_metrics.py`). The four standard metrics are DeepEval Agent Evaluation metrics over the agent's called tools and structured execution trace; the two custom metrics are DeepEval `GEval` metrics that check tool-outcome consistency and business-policy compliance. Scores and errors are stored in the JSONL results. The metrics have not been run against the real judge yet. Potential metrics:
+**Status:** implemented. Six DeepEval metrics — Tool Correctness, Argument Correctness, Task Completion, Step Efficiency, Tool Outcome Consistency, and Business Policy Compliance — run per scenario with an OpenRouter-backed Groq judge (`src/agent/judge.py`, `src/agent/metric_evaluation.py`, `src/agent/custom_metrics.py`). The four standard metrics are DeepEval Agent Evaluation metrics over the agent's called tools and structured execution trace; the two custom metrics are DeepEval `GEval` metrics that check tool-outcome consistency and business-policy compliance. Scores and errors are stored in the JSONL results. The metrics have been run against the real judge; scores vary with model, prompt, and sampling, and occasional structured-output or length-limit failures are recorded as errors. Potential metrics:
 
 | Metric | Question |
 | --- | --- |
 | Tool correctness | Were the expected tools called, and were tools selected appropriately? |
-| Argument correctness | Were the tool call arguments correct for the customer's request? |
-| Task completion | Did the agent complete the task the customer asked for? |
-| Step efficiency | Did the agent reach the outcome without unnecessary steps? |
+| Argument correctness | Were the tool call arguments correct for the customer's request under store policy (for example a status lookup instead of a forbidden `cancel_order` for a shipped order)? |
+| Task completion | Did the agent complete the task the customer asked for, counting policy-compliant resolutions (correct refusal, required escalation, order-ID request, or clear explanation) as complete? |
+| Step efficiency | Did the agent reach the outcome without unnecessary steps, counting required pre-checks and required terminal actions (such as escalation) as efficient? |
 | Tool outcome consistency | Is the answer supported by the actual tool results? |
 | Business policy compliance | Does the answer comply with store policy? |
 | Fact compliance | Are `expected_facts` present and `forbidden_behaviors` absent? |
@@ -59,14 +59,14 @@ Behavior checks must read the trace, not infer tool calls from the final answer.
 
 **Purpose:** show that quality is stable across changes, not just good in one run.
 
-**Status:** partially implemented — `src/agent/regression.py` compares a candidate run against a committed baseline and reports regressions, metric errors, and new failures; the manual LLM-evaluation workflow runs the live comparison.
+**Status:** implemented — `src/agent/regression.py` compares a candidate run against a baseline and reports regressions, metric errors, and new failures; the manual LLM-evaluation workflow runs the live comparison. Baseline and improved runs are stored under `results/`; a standalone stability report is still pending.
 
 Mechanisms:
 
 - **Baseline vs Improved:** run the same 14 scenarios with both agents and compare layer scores, failure counts, and per-category behavior. Baseline and Improved must differ in documented, intentional ways; the comparison must not hide prompt or tool changes.
 - **Regression testing:** convert known-good behaviors and previously observed failures into repeatable checks so they cannot silently regress.
 - **Quality thresholds:** define minimum deterministic pass rates and judge-score thresholds before claiming an improvement.
-- **CI/CD:** run unit tests and deterministic behavior checks in GitHub Actions on every push and pull request. The live evaluation and judge-based checks run in a separate manual workflow that requires API credentials and compares against the committed baseline; judge errors are reported explicitly rather than silently skipped.
+- **CI/CD:** `ci.yml` runs unit tests and Ruff in GitHub Actions on every push and pull request. The live evaluation and judge-based checks run in a separate manual workflow that requires API credentials and compares against the baseline; judge errors are reported explicitly rather than silently skipped.
 
 Reliability reporting should include run configuration, model identifiers when applicable, date, and any skipped or failed checks.
 
@@ -117,4 +117,4 @@ A valid comparison requires:
 - Refund checks depend on a reference date; evaluations must fix it so runs are comparable.
 - Passing the dataset does not prove production safety, compliance, or privacy handling.
 
-Results and limitations will be documented with the experiment report once the runner has been executed. No experiment results are claimed today.
+Implemented results and their limitations are recorded in `docs/DEVELOPMENT_STATUS.md`, `README.md`, and the summary files under `results/`. A standalone experiment report that walks through per-scenario deltas is still pending. Treat a Baseline-vs-Improved comparison as controlled only when both runs share an identical dataset revision.

@@ -17,25 +17,25 @@ This document describes the verified implementation first, then the components t
 | Structured execution traces | `src/agent/traces.py` | Implemented | Pydantic `ToolCallRecord`/`AgentRun` models and helpers that pair ordered tool calls with their results. |
 | Baseline Agent | `src/agent/baseline_agent.py` | Implemented | LangChain `create_agent` graph over the tools with a Google Gemini model; records a structured trace per run. |
 | CLI presentation | `src/agent/cli.py` | Implemented | Rich-based terminal rendering of tool calls and the final response; contains no agent logic. |
-| Agent scaffolding tests | `tests/test_agent_scaffolding.py` | Implemented | 20 pytest tests for config, traces, tool wrappers, agent wiring, refund/escalation rules, and metadata (no network). |
+| Agent scaffolding tests | `tests/test_agent_scaffolding.py` | Implemented | 29 pytest tests for config, traces, order-ID normalization, tool wrappers, agent wiring, refund/escalation/callback rules, and metadata (no network). |
 | Agent orchestration tests | `tests/test_baseline_agent.py` | Implemented | 8 pytest tests driving the agent with mocked models (no tool call, single call, multiple calls, result capture, streaming, API error, recursion limit). |
 | CLI tests | `tests/test_cli.py` | Implemented | 2 pytest tests for run rendering and graceful error handling. |
 | Scenario loader | `src/agent/scenarios.py` | Implemented | Reads and validates `data/evaluation_dataset.json`; never writes to it. |
 | Behavior checks | `src/agent/behavior_checks.py` | Implemented | Deterministic checks for expected tool calls, arguments, escalation, and the cancellation precondition; judge checks are appended when a judge is provided. |
 | Judge checks | `src/agent/judge_checks.py` | Implemented | LLM-judge checks for `expected_facts` and `forbidden_behaviors` via the shared OpenRouter judge; pass/fail/error. |
 | Evaluation runner | `src/agent/evaluation_runner.py` | Implemented | Runs scenarios sequentially with an isolated store per scenario, runs checks, saves results incrementally, and summarizes. |
-| Evaluation tests | `tests/test_evaluation_runner.py` | Implemented | 38 pytest tests for the loader, checks, isolation, incremental saving, error handling, resume, single-scenario rerun, timeout, progress, scenario metadata, judge checks, cancellation precondition, metric integration, metric summary counts, and CLI validation (mocked agent/judge, no network). |
+| Evaluation tests | `tests/test_evaluation_runner.py` | Implemented | 39 pytest tests for the loader, checks, isolation, incremental saving, error handling, resume, single-scenario rerun, timeout, progress, scenario metadata, judge checks, cancellation precondition, metric integration, metric summary counts, and CLI validation (mocked agent/judge, no network). |
 | Judge-check tests | `tests/test_judge_checks.py` | Implemented | 11 pytest tests for expected-fact and forbidden-behavior judging and deterministic-fact filtering (fake judge, no API calls). |
 | Judge model | `src/agent/judge.py` | Implemented | OpenRouter-backed DeepEval judge (Groq model via OpenRouter), built from `JudgeSettings`. |
 | DeepEval metrics | `src/agent/metric_evaluation.py` | Implemented | Tool Correctness, Argument Correctness, Task Completion, Step Efficiency over each scenario's answer, called tools, and structured execution trace. |
 | Metric tests | `tests/test_metric_evaluation.py` | Implemented | 17 pytest tests for tool/trace mapping, test-case construction, metric wiring, and metric scoring/error handling with fake metrics (no API calls). |
-| Custom metric tests | `tests/test_custom_metrics.py` | Implemented | 11 pytest tests for Tool Outcome Consistency and Business Policy Compliance pass/fail/prompt paths and runner integration (stub judge, no API calls). |
+| Custom metric tests | `tests/test_custom_metrics.py` | Implemented | 31 pytest tests for Tool Outcome Consistency, Business Policy Compliance, and the policy-aware Task Completion, Step Efficiency, and Argument Correctness prompts, verdict/score handling, pass/fail/prompt paths, and runner integration (stub judge, no API calls). |
 | Experiment reports | — | Planned | Baseline vs Improved results and failure analysis. |
 | Regression testing / CI | `src/agent/regression.py` | Implemented | Baseline-vs-candidate comparison of scenarios, checks, and metrics with a configurable score tolerance; CI runs lint and unit tests, and a manual workflow runs the live evaluation. |
 
 ## Current and intended data flow
 
-Mermaid diagram; components inside the shaded `Planned` group do not exist yet.
+Mermaid diagram. Everything in the shaded `Implemented` group exists; only the `Planned` group does not.
 
 ```mermaid
 flowchart LR
@@ -45,7 +45,7 @@ flowchart LR
         MODELS["Pydantic models<br/>models.py"]
         STORE["OrderStore<br/>in-memory copy"]
         TOOLS["Five customer support tools"]
-        TESTS["pytest suite<br/>116 tests"]
+        TESTS["pytest suite<br/>191 tests"]
         CONFIG["config.py<br/>agent / judge / tracing"]
         TOOLKIT["toolkit.py<br/>LangChain tool wrappers"]
         AGENT["Baseline Agent<br/>create_agent + Gemini"]
@@ -53,8 +53,11 @@ flowchart LR
         CLI["cli.py<br/>Rich presentation"]
         RUNNER["evaluation_runner.py<br/>sequential, isolated"]
         CHECKS["behavior_checks.py<br/>deterministic"]
+        JCHECK["judge_checks.py<br/>facts / forbidden"]
         JUDGE["judge.py<br/>OpenRouter judge"]
         METRICS["metric_evaluation.py<br/>DeepEval metrics"]
+        RESULTS["results/*.jsonl<br/>+ *.summary.json"]
+        REG["regression.py<br/>eval-regression"]
 
         MS --> STORE
         MODELS --> STORE
@@ -69,23 +72,23 @@ flowchart LR
         AGENT --> CLI
         DS --> RUNNER
         RUNNER --> AGENT
-        RUNNER --> CHECKS
         TRACE --> CHECKS
+        RUNNER --> CHECKS
+        CHECKS --> JCHECK
+        JUDGE --> JCHECK
         RUNNER --> METRICS
         JUDGE --> METRICS
         TRACE --> METRICS
+        RUNNER --> RESULTS
+        RESULTS --> REG
     end
 
     subgraph Planned["Planned - not implemented"]
-        REPORT["Experiment reports"]
-        REG["Regression thresholds"]
-        CI["GitHub Actions"]
-        IMPROVED["Improved Agent"]
+        REPORT["Experiment report"]
+        THRESH["Per-scenario thresholds"]
 
-        RUNNER --> IMPROVED
-        METRICS --> REPORT
-        REPORT --> REG
-        REG --> CI
+        RESULTS --> REPORT
+        METRICS --> THRESH
     end
 ```
 
@@ -95,7 +98,7 @@ flowchart LR
 
 `data/mock_store.json` contains the store name, currency (`USD`), schema version, and 24 orders. Each order has an ID, status, items (product, quantity, unit price), order date, optional delivery date, total, item condition, original-packaging flag, and optional notes.
 
-Current status distribution: 4 `processing`, 3 `shipped`, 15 `delivered`. No `cancelled` order is stored on disk; cancellation adds that status only to an in-memory store.
+Current status distribution: 4 `processing`, 3 `shipped`, 17 `delivered`. No `cancelled` order is stored on disk; cancellation adds that status only to an in-memory store.
 
 The file is a read-only fixture. Nothing in the application writes to it.
 
@@ -178,18 +181,18 @@ The Baseline Agent is implemented with the modern LangChain `create_agent` API. 
 `src/agent/config.py` loads `.env` with `python-dotenv` (`override=False`) and exposes three independent Pydantic models:
 
 - `AgentSettings` — `GOOGLE_API_KEY`, `AGENT_MODEL`, optional `AGENT_TEMPERATURE`.
-- `JudgeSettings` — `OPENROUTER_API_KEY`, `OPENROUTER_BASE_URL` (defaults to `https://openrouter.ai/api/v1`), `JUDGE_MODEL`. Prepared for the future judge; no judge code exists yet.
+- `JudgeSettings` — `OPENROUTER_API_KEY`, `OPENROUTER_BASE_URL` (defaults to `https://openrouter.ai/api/v1`), `JUDGE_MODEL`; consumed by the OpenRouter-backed DeepEval judge.
 - `LangSmithSettings` — `LANGSMITH_TRACING`, `LANGSMITH_API_KEY`, `LANGSMITH_PROJECT`; `apply()` publishes these to the environment LangSmith reads.
 
 Agent and judge settings are loaded by separate functions, so building the agent never requires judge credentials and vice versa. Secrets are held in `SecretStr` and are masked in `repr`, so they cannot leak into logs or traces. No model name or API key is hardcoded.
 
 ### Tool wrappers
 
-`src/agent/toolkit.py` exposes `build_customer_support_tools`, which wraps the existing five tools with LangChain's `@tool` decorator. The wrappers only adapt the signatures (each takes the order ID, or an optional order ID and reason for escalation) and serialize the Pydantic results to JSON. Every call is delegated to `agent.tools.customer_support_tools`; no business rule is reimplemented. An optional `store`, `registry`, and `reference_date` are captured by closure and injected through the tools' keyword-only parameters, which lets the runner isolate state per scenario.
+`src/agent/toolkit.py` exposes `build_customer_support_tools`, which wraps the existing five tools with LangChain's `@tool` decorator. The wrappers adapt the signatures (each takes the order ID, or an optional order ID and reason for escalation), normalize the order ID to digits only (reusing the tools' own `_normalize_order_id`, so an agent-supplied `#1053` reaches the tool as `1053`), and serialize the Pydantic results to JSON. Every call is delegated to `agent.tools.customer_support_tools`; no business rule is reimplemented. An optional `store`, `registry`, and `reference_date` are captured by closure and injected through the tools' keyword-only parameters, which lets the runner isolate state per scenario.
 
 ### Agent and traces
 
-`src/agent/baseline_agent.py` builds a model with `ChatGoogleGenerativeAI` (Google AI Studio direct API) using `AgentSettings`, and compiles the graph with `create_agent(model=..., tools=..., system_prompt=...)`. The system prompt is intentionally minimal except for a refund policy and an escalation policy: it states the agent is a customer support assistant, lists the areas it helps with, tells it to use tools when needed and not to invent order information; after a successful eligibility check it explains eligibility and never claims a refund was processed or offers to process one (no refund-processing tool exists); and it instructs the agent to call `escalate_to_human` (not merely offer it) for: an order not found after checking the order ID, a delivery delay with explicit urgency or an unmet deadline, damaged/missing/tampered/unverifiable items, a request for a human, or a repeated unresolved complaint. It omits other detailed business policies and decision trees, and contains no scenario IDs and no expected tool calls.
+`src/agent/baseline_agent.py` builds a model with `ChatGoogleGenerativeAI` (Google AI Studio direct API) using `AgentSettings`, and compiles the graph with `create_agent(model=..., tools=..., system_prompt=...)`. The system prompt is intentionally minimal except for a refund policy, an escalation policy, and a follow-up/callback policy: it states the agent is a customer support assistant, lists the areas it helps with, tells it to use tools when needed and not to invent order information, response times, or follow-up details; after a successful eligibility check it explains eligibility and never claims a refund was processed or offers to process one (no refund-processing tool exists); it instructs the agent to call `escalate_to_human` (not merely offer it) for: an order not found after checking the order ID, a delivery delay with explicit urgency or an unmet deadline, damaged/missing/tampered/unverifiable items, a request for a human, or a repeated unresolved complaint; and it forbids promising a callback, response time, or follow-up timeframe unless a tool result confirms it, allowing the agent to confirm a successful escalation and give the reference number in neutral wording (for example "Your case has been escalated to our support team. Your reference number is ESC-000001.") without inventing next steps. It omits other detailed business policies and decision trees, and contains no scenario IDs and no expected tool calls.
 
 `BaselineAgent.run` invokes the graph once (with `invoke`) using a `RunnableConfig` that sets a recursion limit (`DEFAULT_RECURSION_LIMIT = 25`) so multi-call interactions terminate, and returns an `AgentRun` from `src/agent/traces.py`. The graph supports multiple tool calls in a single interaction and stops when the model produces a final answer.
 
@@ -233,7 +236,7 @@ Isolation for scenario runs uses the existing data layer: `OrderStore` already s
 - **Summary:** a `results/<label>_<run_id>.summary.json` file reports totals, successful/failed executions, check and metric pass/fail/error counts, and per-category totals.
 - **Entry point:** `uv run eval-runner [--label baseline] [--dataset PATH] [--results-dir DIR] [--reference-date YYYY-MM-DD] [--limit N] [--timeout SECONDS] [--resume RESULTS_JSONL] [--scenario-id SCENARIO_ID]`. `--scenario-id` requires `--resume`.
 
-The runner has not yet been executed against Gemini; that is the next milestone and awaits explicit approval.
+The runner has been executed against Gemini. The baseline experiment and an improved experiment (14 scenarios each) are stored under `results/`, together with their summary files.
 
 ### DeepEval metrics
 
@@ -241,6 +244,12 @@ The runner has not yet been executed against Gemini; that is the next milestone 
 
 - Standard agent metrics: **Tool Correctness**, **Argument Correctness**, **Task Completion**, **Step Efficiency**.
 - Custom metrics in `src/agent/custom_metrics.py`: **Tool Outcome Consistency** and **Business Policy Compliance**.
+
+**Task Completion** uses a policy-aware verdict prompt (`PolicyAwareTaskCompletionTemplate`) so a policy-compliant resolution counts as completion: a correct refusal, a required escalation, asking for an order ID when needed for privacy, or a clear explanation that a cancellation or refund is unavailable. The task is taken deterministically from the scenario's customer message (`test_case.input`) rather than LLM-extracted from the trace. It still penalizes genuinely incomplete or incorrect answers and never requires an action that would violate store policy.
+
+**Step Efficiency** uses a calibrated efficiency prompt (`PolicyAwareStepEfficiencyTemplate`) so required pre-checks (for example `get_order_status` before `cancel_order`) and policy-required terminal actions (for example `escalate_to_human` for damaged items, urgent delivery issues, or explicit human requests) are treated as necessary, and relevant additional details in the answer are not penalized. A trace containing only required calls scores 1.0, while genuinely unnecessary, redundant, or irrelevant actions still are penalized.
+
+**Argument Correctness** uses a policy-aware verdict prompt (`PolicyAwareArgumentCorrectnessTemplate`) that applies store cancellation policy: a cancellation is allowed only for `processing` orders and the agent must verify status first, so a correct status lookup for an order that cannot be cancelled is not penalized for not calling `cancel_order`.
 
 Evidence mapping (there is no retrieval layer, so the agent's own tool calls and trace are the evidence):
 
@@ -261,15 +270,11 @@ Each metric runs via `metric.measure(test_case)`. A failing metric (API error, r
 
 `langchain`, `langchain-google-genai`, `langchain-openai` (agent + OpenRouter judge), `langsmith`, `rich`, `python-dotenv`, and `deepeval` are runtime dependencies in `uv.lock`. `rich` is pinned below 15 because DeepEval 4.x requires `rich<15`; the CLI uses only `Console`, `Panel`, `Table`, and `Status`, which Rich 14 provides.
 
-## Planned components
+## Reports, regression, and CI
 
-The following are requirements for later milestones, not current code.
+Experiment reports will summarize aggregate and per-scenario results, including failures and metric disagreements; a standalone report does not exist yet. GitHub Actions (`.github/workflows/ci.yml`) runs Ruff and the offline unit test suite on every push and on pull requests to `main`; no live evaluation or judge metrics run in that workflow.
 
-### Reports, regression, and CI
-
-Experiment reports will summarize aggregate and per-scenario results, including failures and metric disagreements. GitHub Actions (`.github/workflows/ci.yml`) runs Ruff and the offline unit test suite on every push and on pull requests to `main`; no live evaluation or judge metrics run in CI.
-
-`src/agent/regression.py` (`uv run eval-regression`) compares a candidate results file against a committed baseline. A baseline pass that becomes a candidate failure, error, or missing record is a regression; a score drop greater than the configurable tolerance between two passing metric results is also a regression. Candidate metric errors are reported separately and never counted as passes. The separate `.github/workflows/llm-evaluation.yml` workflow runs the real evaluation manually (`workflow_dispatch`), compares against the committed baseline, fails on regressions, and uploads results as an artifact.
+`src/agent/regression.py` (`uv run eval-regression`) compares a candidate results file against a baseline. A baseline pass that becomes a candidate failure, error, or missing record is a regression; a score drop greater than the configurable tolerance between two passing metric results is also a regression. Candidate metric errors are reported separately and never counted as passes. The separate `.github/workflows/llm-evaluation.yml` workflow runs the real evaluation manually (`workflow_dispatch`), compares against the baseline, fails on regressions, and uploads results as an artifact. Baseline and improved runs are stored under `results/`; because the dataset changed between them, their comparison is not perfectly controlled.
 
 ## Boundaries that must survive later changes
 
@@ -282,13 +287,13 @@ Experiment reports will summarize aggregate and per-scenario results, including 
 
 ## Known limitations of the current stage
 
-- The Baseline Agent exists and the runner is implemented, but no baseline experiment has been run against Gemini yet; there are no Baseline or Improved results.
-- The Baseline system prompt is intentionally minimal apart from the escalation policy, so the baseline is still expected to skip some required pre-checks (for example, calling `cancel_order` without first checking the status); these weaknesses are what the evaluation is meant to reveal. Escalation is now explicitly specified in the prompt and the `escalate_to_human` description.
+- The Baseline Agent and runner are implemented and have been run: baseline and improved experiments (14 scenarios each) are stored under `results/`. The two runs used different dataset revisions, so their comparison is not perfectly controlled.
+- The Baseline system prompt is intentionally minimal apart from the refund, escalation, and follow-up/callback policies, so the baseline is still expected to skip some required pre-checks; these weaknesses are what the evaluation is meant to reveal. Escalation and the cancellation precondition are explicitly specified in the prompt and the tool descriptions.
 - `expected_facts` and forbidden behaviors that do not name a specific tool are scored by the LLM judge (`judge_checks`), not by the Python checks; forbidden tool calls named in the scenario text are also caught deterministically. Judge checks require the OpenRouter judge and are skipped (not failed) when it is not configured.
 - The agent handles a single customer message per run; there is no multi-turn conversation state.
 - Running the agent requires a Google API key and network access. Running metrics additionally requires an OpenRouter key and judge model. The unit tests mock both the agent model and the metrics and make no API calls.
 - Task Completion and Step Efficiency read the nested execution trace built from the agent run; a run with no tool calls still produces a valid agent-root trace.
-- The DeepEval metrics have not been run against the real judge yet.
+- The DeepEval metrics have been run against the real judge, but judge scores vary with model, prompt, and sampling and occasionally error (structured-output and length-limit failures); errors are recorded and never counted as passes.
 - Cancellation and escalation state are in-memory only and reset with the process.
 - The runner creates a fresh `OrderStore` and `EscalationRegistry` per scenario, so scenarios are isolated; the agent's process-wide defaults are not used for evaluation.
 - Refund eligibility depends on `reference_date`; the runner fixes it to `2026-11-24` by default.

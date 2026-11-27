@@ -15,6 +15,8 @@ from typing import Any, Literal
 from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
 from pydantic import BaseModel, Field
 
+from .tools.customer_support_tools import _normalize_order_id
+
 
 class ToolCallRecord(BaseModel):
     """A single executed tool call and the result the agent received for it."""
@@ -24,6 +26,21 @@ class ToolCallRecord(BaseModel):
     arguments: dict[str, Any] = Field(default_factory=dict)
     result: str | None = None
     error: str | None = None
+
+
+def normalize_tool_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
+    """Return tool-call arguments with ``order_id`` normalized to digits only.
+
+    The agent may pass an order ID as ``#1053`` (copied from the customer
+    message); tools must receive ``1053``. Customer-facing text is unaffected.
+    """
+    order_id = arguments.get("order_id")
+    if order_id is None:
+        return arguments
+    normalized = _normalize_order_id(order_id)
+    if normalized is None or normalized == order_id:
+        return arguments
+    return {**arguments, "order_id": normalized}
 
 
 class AgentRun(BaseModel):
@@ -79,7 +96,7 @@ def serialize_messages(messages: Sequence[BaseMessage]) -> list[dict[str, Any]]:
             entry["tool_calls"] = [
                 {
                     "name": call.get("name", ""),
-                    "args": dict(call.get("args") or {}),
+                    "args": normalize_tool_arguments(dict(call.get("args") or {})),
                     "id": call.get("id"),
                 }
                 for call in message.tool_calls
@@ -108,7 +125,7 @@ def extract_tool_calls(messages: Sequence[BaseMessage]) -> list[ToolCallRecord]:
             record = ToolCallRecord(
                 tool_name=call.get("name", ""),
                 call_id=call_id,
-                arguments=dict(call.get("args") or {}),
+                arguments=normalize_tool_arguments(dict(call.get("args") or {})),
             )
             tool_message = results.get(call_id) if call_id else None
             if tool_message is not None:
