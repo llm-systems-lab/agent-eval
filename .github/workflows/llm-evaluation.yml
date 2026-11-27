@@ -6,7 +6,7 @@ on:
       baseline:
         description: "Baseline results JSONL file or directory."
         required: true
-        default: "results/baseline_20261126T132600_cf9726.jsonl"
+        default: "results/baseline_20261127T094457_85110d.jsonl"
       score_tolerance:
         description: "Allowed drop between two passing metric scores before it counts as a regression."
         required: true

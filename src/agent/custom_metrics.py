@@ -15,6 +15,7 @@ recorded by the runner as a metric error; it is never treated as a pass.
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from deepeval.metrics import GEval
@@ -32,7 +33,12 @@ from deepeval.metrics.task_completion import (
 )
 from deepeval.test_case import LLMTestCase, SingleTurnParams
 
-STORE_POLICY = """Refund policy:
+CANCELLATION_POLICY = """Cancellation policy:
+- Cancel only orders whose status is processing.
+- Report the actual cancellation result from the tool; never claim a cancellation
+  succeeded unless the tool result confirms it."""
+
+STORE_POLICY = f"""Refund policy:
 - A refund is eligible only after a successful eligibility check.
 - The standard return window is 30 calendar days from delivery.
 - The item must be unused and in its original packaging.
@@ -45,10 +51,7 @@ Privacy policy:
 - Do not reveal order details without a valid order ID from the customer.
 - Do not share one customer's order information with another customer.
 
-Cancellation policy:
-- Cancel only orders whose status is processing.
-- Report the actual cancellation result from the tool; never claim a cancellation
-  succeeded unless the tool result confirms it.
+{CANCELLATION_POLICY}
 
 Escalation policy:
 - Call escalate_to_human for damaged/missing/tampered items, orders not found
@@ -88,13 +91,40 @@ TOOL_OUTCOME_STEPS = [
         "A resolution or callback time requires a tool result that provides it."
     ),
     (
+        "Saying that a specific detail is not available (for example, no delivery "
+        "date, tracking information, or delay reason) is supported when the "
+        "recorded tool results do not contain that detail: do not treat a truthful "
+        "'not available' as unsupported. Do not accept a claim that a tool "
+        "explicitly provided or confirmed information it did not, and do not accept "
+        "invented details."
+    ),
+    (
         "Treat a claim as unsupported when the tool results contradict it, are "
         "missing, or do not establish the specific outcome."
     ),
     (
+        "A policy claim may be supported by the store's business policy instead of "
+        "a tool result. The relevant business policy is:\n" + CANCELLATION_POLICY
+    ),
+    (
+        "Treat a claim as supported when it matches the business policy above, even "
+        "without a tool call: for example, a statement that a shipped order cannot "
+        "be cancelled is supported by the cancellation policy. Do not treat an "
+        "arbitrary claim as policy-backed when the policy above does not support it, "
+        "and still require tool evidence for claims about completed actions, "
+        "statuses, refunds, or successful escalations."
+    ),
+    (
+        "A claim is also supported when the customer themselves stated that fact in "
+        "the input: for example, 'the laptop arrived with a cracked screen' is "
+        "supported because the customer reported it, and does not require tool "
+        "verification. Do not treat the customer's own description of their issue as "
+        "an unsupported claim."
+    ),
+    (
         "Score 10 when every claim in the final answer is supported by the tool "
-        "results, and 0 when any claim is unsupported. In the reason, name the "
-        "unsupported claim and the tool result."
+        "results or the business policy above, and 0 when any claim is unsupported. "
+        "In the reason, name the unsupported claim and its source."
     ),
 ]
 
@@ -150,7 +180,9 @@ class PolicyAwareTaskCompletionTemplate(TaskCompletionTemplate):  # type: ignore
     """Task Completion prompt that treats policy-compliant resolutions as complete."""
 
     @staticmethod
-    def generate_verdict(task: str, actual_outcome: str) -> str:
+    def generate_verdict(
+        task: str, actual_outcome: str, tool_results: str = ""
+    ) -> str:
         return (
             "Given the task (desired outcome) and the actual achieved outcome, "
             "compare how well the actual outcome aligns with the desired task.\n\n"
@@ -185,6 +217,10 @@ class PolicyAwareTaskCompletionTemplate(TaskCompletionTemplate):  # type: ignore
             "incomplete or incorrect: it ignores the request, gives wrong or "
             "unfounded information, fails to explain a refusal, or omits a "
             "required action that policy allows.\n\n"
+            "Verify the actual outcome against the recorded tool results and trace "
+            "below: treat details that match the tool results as grounded evidence, "
+            "not fabrication, and base the verdict on what the tools actually "
+            "returned rather than assuming the outcome was invented.\n\n"
             "Return a JSON with two keys: `verdict` and `reason`.\n"
             "- The `verdict` should be a score from 0 to 1, where 1 indicates the "
             "actual outcome fully and correctly resolves the task under store "
@@ -196,6 +232,7 @@ class PolicyAwareTaskCompletionTemplate(TaskCompletionTemplate):  # type: ignore
             "**\n\n"
             f"Task:\n{task}\n\n"
             f"Actual outcome:\n{actual_outcome}\n\n"
+            f"Tool results and trace:\n{tool_results}\n\n"
             "JSON:"
         )
 
@@ -215,13 +252,36 @@ class PolicyAwareTaskCompletionMetric(TaskCompletionMetric):  # type: ignore[no-
             async_mode=False,
             evaluation_template=PolicyAwareTaskCompletionTemplate,
         )
+        self._tool_context = ""
+
+    @staticmethod
+    def _format_tool_context(test_case: LLMTestCase) -> str:
+        """Render the recorded tool results/trace so the judge can verify the answer."""
+        trace = getattr(test_case, "_trace_dict", None)
+        if isinstance(trace, dict):
+            return json.dumps(trace, indent=2, default=str)
+        tools_called = getattr(test_case, "tools_called", None) or []
+        return json.dumps(
+            [
+                {
+                    "name": getattr(call, "name", None),
+                    "input_parameters": getattr(call, "input_parameters", None),
+                    "output": getattr(call, "output", None),
+                }
+                for call in tools_called
+            ],
+            indent=2,
+            default=str,
+        )
 
     def _extract_task_and_outcome(self, test_case: LLMTestCase) -> tuple[str, Any]:
+        self._tool_context = self._format_tool_context(test_case)
         return test_case.input, test_case.actual_output
 
     async def _a_extract_task_and_outcome(
         self, test_case: LLMTestCase
     ) -> tuple[str, Any]:
+        self._tool_context = self._format_tool_context(test_case)
         return test_case.input, test_case.actual_output
 
     def _get_prompt(
@@ -230,6 +290,8 @@ class PolicyAwareTaskCompletionMetric(TaskCompletionMetric):  # type: ignore[no-
         # DeepEval resolves internal prompts (such as the experimental
         # system-one score) by the metric's class name. Pin the base name so
         # this differently-named subclass still resolves them.
+        if method == "generate_verdict" and "tool_results" not in kwargs:
+            kwargs["tool_results"] = self._tool_context
         if template_class is None and getattr(
             self.evaluation_template, method, None
         ) is None:
@@ -304,6 +366,14 @@ class PolicyAwareStepEfficiencyTemplate(StepEfficiencyTemplate):  # type: ignore
             "- If it is genuinely unclear whether an action was required, do not "
             "assume it was unnecessary when store policy or the tool contract "
             "plausibly requires it.\n\n"
+            "8. Missing required information.\n"
+            "- When the request cannot be fulfilled without an order ID or another "
+            "identifier the customer has not provided, asking the customer for it is "
+            "the correct and efficient action: it is a required step before any "
+            "lookup. In that situation the absence of tool calls is efficient, not an "
+            "inefficiency, and must not be penalized.\n"
+            "- Do not expect order tools to be called without the required "
+            "identifier.\n\n"
             "SCORING SCALE\n\n"
             "Choose the score only from these values, and make the reason consistent "
             "with the score:\n"

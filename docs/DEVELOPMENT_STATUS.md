@@ -32,7 +32,7 @@ The deterministic tool layer is complete and tested. The Baseline Agent is imple
 | Judge model | `src/agent/judge.py`: `OpenRouterJudge` (`DeepEvalBaseLLM`) via `langchain-openai` on OpenRouter, from `JudgeSettings`. |
 | DeepEval metrics | `src/agent/metric_evaluation.py`: Tool Correctness, Argument Correctness (policy-aware prompt), Task Completion (policy-aware prompt), Step Efficiency (calibrated prompt); `src/agent/custom_metrics.py`: Tool Outcome Consistency and Business Policy Compliance (both `GEval`); scores/errors stored per scenario. |
 | Judge checks | `src/agent/judge_checks.py`: LLM-judge checks for `expected_facts` and `forbidden_behaviors` via the shared OpenRouter judge; `pass`/`fail`/`error`. |
-| Unit tests | 38 tool tests (`tests/test_customer_support_tools.py`); 29 scaffolding (`tests/test_agent_scaffolding.py`); 8 orchestration (`tests/test_baseline_agent.py`); 2 CLI (`tests/test_cli.py`); 39 evaluation (`tests/test_evaluation_runner.py`); 17 metric (`tests/test_metric_evaluation.py`); 31 custom metric (`tests/test_custom_metrics.py`); 11 judge-check (`tests/test_judge_checks.py`); 16 regression (`tests/test_regression.py`); 191 tests total. |
+| Unit tests | 38 tool tests (`tests/test_customer_support_tools.py`); 39 scaffolding (`tests/test_agent_scaffolding.py`); 10 orchestration (`tests/test_baseline_agent.py`); 2 CLI (`tests/test_cli.py`); 39 evaluation (`tests/test_evaluation_runner.py`); 17 metric (`tests/test_metric_evaluation.py`); 36 custom metric (`tests/test_custom_metrics.py`); 11 judge-check (`tests/test_judge_checks.py`); 16 regression (`tests/test_regression.py`); 208 tests total. |
 | Documentation | `README.md`, `AGENTS.md`, `docs/PROJECT_CONTEXT.md`, `docs/ARCHITECTURE.md`, `docs/EVALUATION_STRATEGY.md`, this file. |
 | Baseline experiment | `results/baseline_20261126T132600_cf9726.jsonl`/`.summary.json`: 14 scenarios; 83 checks passed, 1 failed; 72 metrics passed, 12 failed. |
 | Improved experiment | `results/improvements_20261127T082918_e85922.jsonl`/`.summary.json`: 14 scenarios; 75 checks passed, 8 failed, 1 check error; 80 metrics passed, 4 failed, 0 metric errors. |
@@ -42,7 +42,7 @@ The deterministic tool layer is complete and tested. The Baseline Agent is imple
 
 ```text
 $ uv run pytest -q
-191 passed in 6.41s
+208 passed in 5.77s
 
 $ uvx ruff check src tests
 All checks passed!

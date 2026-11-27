@@ -356,7 +356,7 @@ This workflow is fully offline: it runs lint and the mocked unit tests and calls
 
 Triggered manually via `workflow_dispatch` with two inputs:
 
-- `baseline` — baseline results JSONL file or directory (default `results/baseline_20261126T132600_cf9726.jsonl`);
+- `baseline` — baseline results JSONL file or directory (default `results/baseline_20261127T094457_85110d.jsonl`);
 - `score_tolerance` — allowed drop between two passing metric scores before it counts as a regression (default `0.1`).
 
 Behavior:

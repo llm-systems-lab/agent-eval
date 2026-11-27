@@ -394,6 +394,15 @@ class TestToolkit:
         ):
             assert keyword in description
 
+    def test_get_order_status_description_notes_no_delivery_date(self) -> None:
+        tools = {t.name: t for t in build_customer_support_tools(store=make_store())}
+
+        description = " ".join(
+            (tools["get_order_status"].description or "").lower().split()
+        )
+
+        assert "does not include a delivery date" in description
+
 
 class TestAgentWiring:
     def test_system_prompt_states_escalation_rules(self) -> None:
@@ -416,6 +425,26 @@ class TestAgentWiring:
         assert "eligibility check" in prompt
         assert "refund has been processed" in prompt
         assert "refund-processing tool" in prompt
+
+    def test_system_prompt_requires_stating_eligibility_check_performed(self) -> None:
+        prompt = " ".join(SYSTEM_PROMPT.lower().split())
+
+        assert "performed an eligibility check" in prompt
+        assert "check_refund_eligibility" in prompt
+
+    def test_system_prompt_distinguishes_return_eligibility_from_refund(self) -> None:
+        prompt = " ".join(SYSTEM_PROMPT.lower().split())
+
+        assert "report return eligibility only" in prompt
+        assert (
+            "do not state that it is eligible for, approved for, or guaranteed a "
+            "refund" in prompt
+        )
+        assert "checking refund eligibility does not itself process a refund" in prompt
+        assert (
+            "do not claim whether a refund has or has not previously been processed "
+            "unless an actual tool result explicitly confirms it" in prompt
+        )
 
     def test_order_status_prompt_forbids_invented_times(self) -> None:
         prompt = " ".join(SYSTEM_PROMPT.lower().split())
@@ -450,6 +479,52 @@ class TestAgentWiring:
             "your case has been escalated to our support team. "
             "your reference number is esc-000001."
         ) in prompt
+
+    def test_system_prompt_states_delivery_date_guidance(self) -> None:
+        prompt = " ".join(SYSTEM_PROMPT.lower().split())
+
+        assert "no delivery date is currently available" in prompt
+        assert "never invent, estimate, or guarantee a delivery date" in prompt
+
+    def test_system_prompt_requires_status_check_for_delivery_disputes(self) -> None:
+        prompt = " ".join(SYSTEM_PROMPT.lower().split())
+
+        assert "call get_order_status first (not get_order_details)" in prompt
+        assert "marked delivered but not received" in prompt
+
+    def test_system_prompt_requires_damage_acknowledgement_and_human_review(
+        self,
+    ) -> None:
+        prompt = " ".join(SYSTEM_PROMPT.lower().split())
+
+        assert "explicitly acknowledge the customer's specific claim" in prompt
+        assert "human support will review the refund request" in prompt
+
+    def test_system_prompt_requires_empathy_for_upset_customers(self) -> None:
+        prompt = " ".join(SYSTEM_PROMPT.lower().split())
+
+        assert "acknowledge their frustration empathetically" in prompt
+
+    def test_system_prompt_routes_status_checks_to_status_tool(self) -> None:
+        prompt = " ".join(SYSTEM_PROMPT.lower().split())
+
+        assert (
+            "use get_order_details only when the customer asks about the order's items"
+            in prompt
+        )
+
+    def test_system_prompt_requires_self_service_cancellation_explanation(self) -> None:
+        prompt = " ".join(SYSTEM_PROMPT.lower().split())
+
+        assert "self-service cancellation tool" in prompt
+        assert "still processing" in prompt
+
+    def test_system_prompt_requires_no_delivery_date_for_processing_or_shipped(
+        self,
+    ) -> None:
+        prompt = " ".join(SYSTEM_PROMPT.lower().split())
+
+        assert "if an order is still processing or shipped" in prompt
 
     def _agent(self) -> BaselineAgent:
         settings = AgentSettings(google_api_key="dummy-key", model="gemini-test")

@@ -33,7 +33,7 @@ def build_customer_support_tools(
 
     @tool
     def get_order_status(order_id: str) -> str:
-        """Return the current status of an order: processing, shipped, delivered, or cancelled."""
+        """Return the current status of an order: processing, shipped, delivered, or cancelled. This returns only the status and does not include a delivery date."""
         return cst.get_order_status(
             _normalize_order_id(order_id) or "", store=store
         ).model_dump_json()

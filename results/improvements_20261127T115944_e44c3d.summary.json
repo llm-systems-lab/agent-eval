@@ -2,19 +2,19 @@
   "total": 14,
   "successful": 14,
   "failed": 0,
-  "scenarios_passed": 7,
-  "checks_passed": 75,
-  "checks_failed": 8,
-  "checks_error": 1,
-  "metrics_passed": 80,
-  "metrics_failed": 4,
+  "scenarios_passed": 14,
+  "checks_passed": 84,
+  "checks_failed": 0,
+  "checks_error": 0,
+  "metrics_passed": 84,
+  "metrics_failed": 0,
   "metrics_error": 0,
   "per_category": {
     "order_status": {
       "total": 3,
       "successful": 3,
       "failed": 0,
-      "passed": 1
+      "passed": 3
     },
     "order_details": {
       "total": 2,
@@ -26,19 +26,19 @@
       "total": 4,
       "successful": 4,
       "failed": 0,
-      "passed": 3
+      "passed": 4
     },
     "cancellation": {
       "total": 2,
       "successful": 2,
       "failed": 0,
-      "passed": 1
+      "passed": 2
     },
     "escalation": {
       "total": 3,
       "successful": 3,
       "failed": 0,
-      "passed": 0
+      "passed": 3
     }
   }
 }

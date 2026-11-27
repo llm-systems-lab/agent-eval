@@ -295,3 +295,24 @@ class TestBaselineAgentOrchestration:
 
         with pytest.raises(GraphRecursionError):
             agent.run("keep calling the tool")
+
+    def test_degenerate_answer_is_retried(self) -> None:
+        model = ScriptedChatModel(
+            responses=[
+                AIMessage(content="\u0633\u062a\u0645"),
+                AIMessage(content="Your case has been escalated to our support team."),
+            ]
+        )
+        agent = make_agent(model)
+
+        run = agent.run("I want to speak to a human")
+
+        assert run.answer == "Your case has been escalated to our support team."
+
+    def test_substantive_answer_is_not_retried(self) -> None:
+        model = ScriptedChatModel(responses=[AIMessage(content="Here is the status.")])
+        agent = make_agent(model)
+
+        run = agent.run("status?")
+
+        assert run.answer == "Here is the status."

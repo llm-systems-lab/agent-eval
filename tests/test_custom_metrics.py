@@ -205,6 +205,44 @@ class TestToolOutcomeConsistencyMetric:
         assert "check_refund_eligibility" in prompt
         assert "Returns use a 30-day window." in prompt
 
+    def test_prompt_treats_absent_detail_as_supported(self) -> None:
+        judge = StubJudge()
+        metric = ToolOutcomeConsistencyMetric(judge)
+
+        metric.measure(make_test_case())
+
+        prompt = " ".join(judge.prompts[0].lower().split())
+        assert (
+            "is supported when the recorded tool results do not contain that detail"
+            in prompt
+        )
+        assert "do not treat a truthful 'not available' as unsupported" in prompt
+        assert (
+            "tool explicitly provided or confirmed information it did not" in prompt
+        )
+
+    def test_prompt_allows_business_policy_support(self) -> None:
+        judge = StubJudge()
+        metric = ToolOutcomeConsistencyMetric(judge)
+
+        metric.measure(make_test_case())
+
+        prompt = " ".join(judge.prompts[0].lower().split())
+        assert "cancel only orders whose status is processing" in prompt
+        assert "supported by the cancellation policy" in prompt
+        assert "require tool evidence for claims about completed actions" in prompt
+
+    def test_prompt_treats_customer_reported_facts_as_supported(self) -> None:
+        judge = StubJudge()
+        metric = ToolOutcomeConsistencyMetric(judge)
+
+        metric.measure(make_test_case())
+
+        prompt = " ".join(judge.prompts[0].lower().split())
+        assert "the customer themselves stated" in prompt
+        assert "does not require tool verification" in prompt
+        assert "customer's own description" in prompt
+
     def test_name_and_threshold(self) -> None:
         metric = ToolOutcomeConsistencyMetric(StubJudge())
 
@@ -370,6 +408,18 @@ class TestPolicyAwareTaskCompletion:
         assert judge.prompts
         assert make_scenario().customer_message in judge.prompts[0]
 
+    def test_task_completion_judge_receives_tool_results(self) -> None:
+        judge = TaskCompletionJudge()
+        metric = policy_aware_task_completion_metric(judge)
+
+        metric.measure(make_test_case())
+
+        prompt = " ".join(judge.prompts[0].split())
+        assert "Tool results and trace" in prompt
+        assert "check_refund_eligibility" in prompt
+        assert "eligible" in prompt
+        assert "grounded evidence" in prompt
+
 
 class TestPolicyAwareStepEfficiency:
     def test_template_prompt_states_calibration_rules(self) -> None:
@@ -405,6 +455,19 @@ class TestPolicyAwareStepEfficiency:
 
         assert "A trace with only required calls scores 1.0" in prompt
         assert "the score must be 1.0" in prompt
+
+    def test_template_treats_missing_identifier_request_as_efficient(self) -> None:
+        prompt = PolicyAwareStepEfficiencyTemplate.get_execution_efficiency(
+            task="I don't have my order number, but tell me what I bought last week.",
+            trace_json_str="TRACE",
+        )
+
+        assert "Missing required information" in prompt
+        assert (
+            "asking the customer for it is the correct and efficient action" in prompt
+        )
+        assert "the absence of tool calls is efficient, not an" in prompt
+        assert "Do not expect order tools to be called without the required" in prompt
 
     def test_metric_uses_policy_aware_template(self) -> None:
         metric = policy_aware_step_efficiency_metric(StubJudge())

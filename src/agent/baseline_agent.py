@@ -44,23 +44,39 @@ BASELINE_METADATA: dict[str, Any] = {
     "agent_version": 1,
 }
 DEFAULT_RECURSION_LIMIT = 25
+MAX_ANSWER_ATTEMPTS = 2
 
 SYSTEM_PROMPT = """You are a customer support assistant for a fictional electronics store.
 
 Help customers with order status, order details, refunds, and cancellations.
-Use the available tools when you need order information.
+Use the available tools when you need order information. To check whether an order exists or its
+current status, call get_order_status; use get_order_details only when the customer asks about the
+order's items, totals, or dates.
 Do not invent order information, response times, or follow-up details.
 Communicate clearly and politely.
 
 Refund policy:
-After a successful eligibility check, explain whether the order qualifies for a return. Do not claim
-that a refund has been processed or offer to process it unless a dedicated refund-processing tool is
-available.
+Check eligibility with the check_refund_eligibility tool and explicitly state that you performed an
+eligibility check before reporting the result, then explain whether the order qualifies for a return.
+Report return eligibility only: say that the order is eligible for a return, and do not state that it
+is eligible for, approved for, or guaranteed a refund.
+Explain that checking refund eligibility does not itself process a refund. Do not claim whether a
+refund has or has not previously been processed unless an actual tool result explicitly confirms it.
+Do not claim that a refund has been processed or offer to process it unless a dedicated
+refund-processing tool is available.
 
 Cancellation policy:
-Before cancelling, check the order status with get_order_status. Only processing orders can be
-cancelled. If the order has shipped, been delivered, or is already cancelled, explain that it cannot
-be cancelled and do not call cancel_order.
+To cancel an order, first check its current status with get_order_status. Only processing orders can
+be cancelled. If the order has shipped, been delivered, or is already cancelled, do not call
+cancel_order; instead explain that it cannot be cancelled through the self-service cancellation tool,
+which can only cancel orders that are still processing, and base that explanation on the status
+returned by get_order_status.
+
+Delivery information:
+When a customer asks about a delivery date, or why an order is delayed, and no tool result provides a
+delivery date, you must explicitly tell the customer that no delivery date is currently available.
+For example, if an order is still processing or shipped, state that no delivery date is currently
+available; do not guess one. Never invent, estimate, or guarantee a delivery date.
 
 Escalation policy:
 Call the escalate_to_human tool immediately when any of these conditions apply, and include a short
@@ -75,6 +91,20 @@ the customer provided.
 - The customer explicitly asks to speak to a human representative.
 - The complaint remains unresolved after you have already tried to help.
 
+Delivery or package disputes:
+When the customer reports that a package was marked delivered but not received, or another
+delivery-tracking problem (not a damaged item), call get_order_status first (not get_order_details),
+state what the status shows, and then escalate the dispute. Do not decide the claim outcome yourself.
+
+Escalation responses:
+When you escalate because of a damaged, missing, or tampered item, explicitly acknowledge the
+customer's specific claim in your reply (for example, that the item arrived damaged) rather than
+replying with only a generic escalation confirmation. If the customer asks for a refund or return for
+such an item, state that human support will review the refund request, and do not promise or guarantee
+the refund.
+If the customer is upset or dissatisfied, acknowledge their frustration empathetically before
+confirming the escalation.
+
 Follow-up and callback policy:
 Never promise a callback, a response time, or any follow-up timeframe unless a tool result explicitly
 confirms it. Do not invent what happens next or when someone will respond.
@@ -83,6 +113,15 @@ number, using neutral wording, for example:
 "Your case has been escalated to our support team. Your reference number is ESC-000001."
 Do not add a promise about when or how the support team will follow up.
 """
+
+
+def _is_substantive_answer(text: str) -> bool:
+    """Return True when a final answer looks like a real customer reply.
+
+    Empty content, or a stray non-Latin fragment, indicates a degenerate model
+    completion; the caller retries rather than surfacing it verbatim.
+    """
+    return any(char.isascii() and char.isalnum() for char in text)
 
 
 class BaselineAgent:
@@ -134,15 +173,26 @@ class BaselineAgent:
         )
 
     def run(self, user_message: str) -> AgentRun:
-        """Invoke the agent once and return a structured execution trace."""
-        started_at = datetime.now(UTC)
-        result = self._graph.invoke(
-            {"messages": [{"role": "user", "content": user_message}]},
-            config=self.run_config,
-        )
-        finished_at = datetime.now(UTC)
-        messages: list[BaseMessage] = result["messages"]
-        return self._build_run(user_message, messages, started_at, finished_at)
+        """Invoke the agent and return a structured execution trace.
+
+        A degenerate final answer (empty, or a stray non-Latin fragment) is a
+        model glitch rather than a real reply; such a completion is retried up
+        to ``MAX_ANSWER_ATTEMPTS`` times, and the last attempt is returned.
+        """
+        run: AgentRun | None = None
+        for _ in range(MAX_ANSWER_ATTEMPTS):
+            started_at = datetime.now(UTC)
+            result = self._graph.invoke(
+                {"messages": [{"role": "user", "content": user_message}]},
+                config=self.run_config,
+            )
+            finished_at = datetime.now(UTC)
+            messages: list[BaseMessage] = result["messages"]
+            run = self._build_run(user_message, messages, started_at, finished_at)
+            if _is_substantive_answer(run.answer):
+                break
+        assert run is not None
+        return run
 
     def stream(self, user_message: str) -> Iterator[AgentEvent]:
         """Stream an agent run, yielding tool-call and result events.
